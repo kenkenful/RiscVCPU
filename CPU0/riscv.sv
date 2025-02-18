@@ -45,6 +45,8 @@ module riscv(
     reg [3:0] rmem;
     reg [31:0] alu_out;         // alu output
     reg [31:0] mem_out;         // mem output
+    
+    reg [31:0] jump_address;
 
     // Distributed RAM
     //reg [31:0] mem [0:4095];  // instruction and data melmory
@@ -68,74 +70,24 @@ module riscv(
         end
         $fclose(fd);      
     end
-    
-    assign inst = {mem[pc+3], mem[pc+2], mem[pc+1], mem[pc+0]};
-       
-    wire [31:0] load_data = {mem[mem_addr + 3], mem[mem_addr+2], mem[mem_addr+1], mem[mem_addr+0]};
-    
-    always_comb begin
-        mem_out = 32'b0;
-        case (rmem) 
-            4'b0001:begin
-                mem_out = {24'h0, load_data[ 7: 0]};
-            end 
-            4'b1001:begin
-                mem_out = {{24{load_data[ 7]}}, load_data[ 7: 0]};  
-            end
-            4'b0010:begin
-                mem_out = {16'h0, load_data[15: 0]}; 
-            end
-            4'b1010:begin
-                mem_out = {{16{load_data[15]}}, load_data[15: 0]};  
-            end
-            4'b0100:begin
-                mem_out = load_data;
-            end
-            default:;
-        endcase
-    end
-    
-    always_ff@(posedge clk)begin
-        case(wmem)
-          4'b0001:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-          end
-          4'b0010:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-          end
-          4'b0100:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-          end
-          4'b1000:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-          end
-          4'b0011:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-            mem[mem_addr + 1] <= store_data[15:8];
-          end
-          4'b1100:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-            mem[mem_addr + 1] <= store_data[15:8];
+
           
-          end
-          4'b1111:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-            mem[mem_addr + 1] <= store_data[15:8];
-            mem[mem_addr + 2] <= store_data[23:16];
-            mem[mem_addr + 3] <= store_data[31:24];
-          end
-          default:;
-        endcase
-      
+    wire [31:0] pc_plus_4 = pc + 4; // pc + 4
+    wire [31:0] next_pc = ((i_beq | i_bne | i_blt | i_bge | i_bltu | i_bgeu) & alu_out) | i_jal | i_jalr ? jump_address : pc_plus_4;
+    
+    // pc
+    always_ff @ (posedge clk) begin
+        if (reset) pc <= 0;
+        else       pc <= next_pc;
     end
+    
+    // fetch
+    assign inst = {mem[pc+3], mem[pc+2], mem[pc+1], mem[pc+0]};
 
-    reg [31:0] next_pc;                            // next pc
-    wire [31:0] pc_plus_4 = pc + 4;                  // pc + 4
-
-    // instruction format
+    // decode
     wire [6:0] opcode = inst[6:0];   //
-    wire [2:0] func3  = inst[14:12]; //
-    wire [6:0] func7  = inst[31:25]; //
+    wire [2:0] funct3  = inst[14:12]; //
+    wire [6:0] funct7  = inst[31:25]; //
     wire [4:0] rd     = inst[11:7];  //
     wire [4:0] rs     = inst[19:15]; // = rs1
     wire [4:0] rt     = inst[24:20]; // = rs2
@@ -155,68 +107,71 @@ module riscv(
     wire   [31:0] jaloffset = {{11{sign}},inst[31],inst[19:12],inst[20],inst[30:21],1'b0}; // jal
     // jal target               31:21          20       19:12       11       10:1      0
 
-    // instruction decode
     wire i_auipc = (opcode == 7'b0010111);
     wire i_lui   = (opcode == 7'b0110111);
     wire i_jal   = (opcode == 7'b1101111);
-    wire i_jalr  = (opcode == 7'b1100111) & (func3 == 3'b000);
-    wire i_beq   = (opcode == 7'b1100011) & (func3 == 3'b000);
-    wire i_bne   = (opcode == 7'b1100011) & (func3 == 3'b001);
-    wire i_blt   = (opcode == 7'b1100011) & (func3 == 3'b100);
-    wire i_bge   = (opcode == 7'b1100011) & (func3 == 3'b101);
-    wire i_bltu  = (opcode == 7'b1100011) & (func3 == 3'b110);
-    wire i_bgeu  = (opcode == 7'b1100011) & (func3 == 3'b111);
-    wire i_lb    = (opcode == 7'b0000011) & (func3 == 3'b000);
-    wire i_lh    = (opcode == 7'b0000011) & (func3 == 3'b001);
-    wire i_lw    = (opcode == 7'b0000011) & (func3 == 3'b010);
-    wire i_lbu   = (opcode == 7'b0000011) & (func3 == 3'b100);
-    wire i_lhu   = (opcode == 7'b0000011) & (func3 == 3'b101);
-    wire i_sb    = (opcode == 7'b0100011) & (func3 == 3'b000);
-    wire i_sh    = (opcode == 7'b0100011) & (func3 == 3'b001);
-    wire i_sw    = (opcode == 7'b0100011) & (func3 == 3'b010);
-    wire i_addi  = (opcode == 7'b0010011) & (func3 == 3'b000);
-    wire i_slti  = (opcode == 7'b0010011) & (func3 == 3'b010);
-    wire i_sltiu = (opcode == 7'b0010011) & (func3 == 3'b011);
-    wire i_xori  = (opcode == 7'b0010011) & (func3 == 3'b100);
-    wire i_ori   = (opcode == 7'b0010011) & (func3 == 3'b110);
-    wire i_andi  = (opcode == 7'b0010011) & (func3 == 3'b111);
-    wire i_slli  = (opcode == 7'b0010011) & (func3 == 3'b001) & (func7 == 7'b0000000);
-    wire i_srli  = (opcode == 7'b0010011) & (func3 == 3'b101) & (func7 == 7'b0000000);
-    wire i_srai  = (opcode == 7'b0010011) & (func3 == 3'b101) & (func7 == 7'b0100000);
-    wire i_add   = (opcode == 7'b0110011) & (func3 == 3'b000) & (func7 == 7'b0000000);
-    wire i_sub   = (opcode == 7'b0110011) & (func3 == 3'b000) & (func7 == 7'b0100000);
-    wire i_sll   = (opcode == 7'b0110011) & (func3 == 3'b001) & (func7 == 7'b0000000);
-    wire i_slt   = (opcode == 7'b0110011) & (func3 == 3'b010) & (func7 == 7'b0000000);
-    wire i_sltu  = (opcode == 7'b0110011) & (func3 == 3'b011) & (func7 == 7'b0000000);
-    wire i_xor   = (opcode == 7'b0110011) & (func3 == 3'b100) & (func7 == 7'b0000000);
-    wire i_srl   = (opcode == 7'b0110011) & (func3 == 3'b101) & (func7 == 7'b0000000);
-    wire i_sra   = (opcode == 7'b0110011) & (func3 == 3'b101) & (func7 == 7'b0100000);
-    wire i_or    = (opcode == 7'b0110011) & (func3 == 3'b110) & (func7 == 7'b0000000);
-    wire i_and   = (opcode == 7'b0110011) & (func3 == 3'b111) & (func7 == 7'b0000000);
+    wire i_jalr  = (opcode == 7'b1100111) & (funct3 == 3'b000);
+    wire i_beq   = (opcode == 7'b1100011) & (funct3 == 3'b000);
+    wire i_bne   = (opcode == 7'b1100011) & (funct3 == 3'b001);
+    wire i_blt   = (opcode == 7'b1100011) & (funct3 == 3'b100);
+    wire i_bge   = (opcode == 7'b1100011) & (funct3 == 3'b101);
+    wire i_bltu  = (opcode == 7'b1100011) & (funct3 == 3'b110);
+    wire i_bgeu  = (opcode == 7'b1100011) & (funct3 == 3'b111);
+    wire i_lb    = (opcode == 7'b0000011) & (funct3 == 3'b000);
+    wire i_lh    = (opcode == 7'b0000011) & (funct3 == 3'b001);
+    wire i_lw    = (opcode == 7'b0000011) & (funct3 == 3'b010);
+    wire i_lbu   = (opcode == 7'b0000011) & (funct3 == 3'b100);
+    wire i_lhu   = (opcode == 7'b0000011) & (funct3 == 3'b101);
+    wire i_sb    = (opcode == 7'b0100011) & (funct3 == 3'b000);
+    wire i_sh    = (opcode == 7'b0100011) & (funct3 == 3'b001);
+    wire i_sw    = (opcode == 7'b0100011) & (funct3 == 3'b010);
+    wire i_addi  = (opcode == 7'b0010011) & (funct3 == 3'b000);
+    wire i_slti  = (opcode == 7'b0010011) & (funct3 == 3'b010);
+    wire i_sltiu = (opcode == 7'b0010011) & (funct3 == 3'b011);
+    wire i_xori  = (opcode == 7'b0010011) & (funct3 == 3'b100);
+    wire i_ori   = (opcode == 7'b0010011) & (funct3 == 3'b110);
+    wire i_andi  = (opcode == 7'b0010011) & (funct3 == 3'b111);
+    wire i_slli  = (opcode == 7'b0010011) & (funct3 == 3'b001) & (funct7 == 7'b0000000);
+    wire i_srli  = (opcode == 7'b0010011) & (funct3 == 3'b101) & (funct7 == 7'b0000000);
+    wire i_srai  = (opcode == 7'b0010011) & (funct3 == 3'b101) & (funct7 == 7'b0100000);
+    wire i_add   = (opcode == 7'b0110011) & (funct3 == 3'b000) & (funct7 == 7'b0000000);
+    wire i_sub   = (opcode == 7'b0110011) & (funct3 == 3'b000) & (funct7 == 7'b0100000);
+    wire i_sll   = (opcode == 7'b0110011) & (funct3 == 3'b001) & (funct7 == 7'b0000000);
+    wire i_slt   = (opcode == 7'b0110011) & (funct3 == 3'b010) & (funct7 == 7'b0000000);
+    wire i_sltu  = (opcode == 7'b0110011) & (funct3 == 3'b011) & (funct7 == 7'b0000000);
+    wire i_xor   = (opcode == 7'b0110011) & (funct3 == 3'b100) & (funct7 == 7'b0000000);
+    wire i_srl   = (opcode == 7'b0110011) & (funct3 == 3'b101) & (funct7 == 7'b0000000);
+    wire i_sra   = (opcode == 7'b0110011) & (funct3 == 3'b101) & (funct7 == 7'b0100000);
+    wire i_or    = (opcode == 7'b0110011) & (funct3 == 3'b110) & (funct7 == 7'b0000000);
+    wire i_and   = (opcode == 7'b0110011) & (funct3 == 3'b111) & (funct7 == 7'b0000000);
+    
+    // rv32 zicsr
+    wire i_csrrw  = (opcode == 7'b1110011) && (funct3 == 3'b001);
+    wire i_csrrs  = (opcode == 7'b1110011) && (funct3 == 3'b010);
+    wire i_csrrc  = (opcode == 7'b1110011) && (funct3 == 3'b011);
+    wire i_csrrwi = (opcode == 7'b1110011) && (funct3 == 3'b101);
+    wire i_csrrsi = (opcode == 7'b1110011) && (funct3 == 3'b110);
+    wire i_csrrci = (opcode == 7'b1110011) && (funct3 == 3'b111);
+
+    // rv32m
+    wire i_mul    = (opcode == 7'b0110011) && (funct3 == 3'b000) && (funct7 == 7'b0000001);
+    wire i_mulh   = (opcode == 7'b0110011) && (funct3 == 3'b001) && (funct7 == 7'b0000001);
+    wire i_mulhsu = (opcode == 7'b0110011) && (funct3 == 3'b010) && (funct7 == 7'b0000001);
+    wire i_mulhu  = (opcode == 7'b0110011) && (funct3 == 3'b011) && (funct7 == 7'b0000001);
+    wire i_div    = (opcode == 7'b0110011) && (funct3 == 3'b100) && (funct7 == 7'b0000001);
+    wire i_divu   = (opcode == 7'b0110011) && (funct3 == 3'b101) && (funct7 == 7'b0000001);
+    wire i_rem    = (opcode == 7'b0110011) && (funct3 == 3'b110) && (funct7 == 7'b0000001);
+    wire i_remu   = (opcode == 7'b0110011) && (funct3 == 3'b111) && (funct7 == 7'b0000001);
 
 
-    // pc
-    always_ff @ (posedge clk) begin
-        if (reset) pc <= 0;
-        else       pc <= next_pc;
-    end
-
-    wire        load = i_lw | i_lb | i_lbu | i_lh | i_lhu;     
-    wire [31:0] write_back_data = load ? mem_out : alu_out;
 
     reg    [31:0] regfile [1:31];                          //  regfile[0] is zero register.
    
     wire   [31:0] a = (rs==0) ? 0 : regfile[rs];           //  index 0 is zero register, so return 0. 
     wire   [31:0] b = (rt==0) ? 0 : regfile[rt];           //  index 0 is zero register, so return 0.
-    
-    
-    always_ff @ (posedge clk) begin
-        if (write_back && (rd != 0)) begin                 // rd = 0 is zero register, so cannot write back.
-            regfile[rd] <= write_back_data;                 
-        end
-    end
 
-    // control signals, will be combinational circuit
+
+    // execute
     always_comb begin                                      
         alu_out = 0;                                       // alu output
         mem_addr  = 0;                                     // memory address
@@ -224,14 +179,15 @@ module riscv(
         wmem = 4'b0000;                                    // write memory (sw)
         rmem = 4'b000;
         store_data = b;                                    // store data
-        next_pc = pc_plus_4;
+        //next_pc = pc_plus_4;
         uart_en = 1'b0;
         uart_tx_data = 8'b0;
+        jump_address = 0;
      
         case (1'b1)
             i_add: begin                                   // add
               alu_out = a + b;
-              write_back  = 1; 
+              write_back = 1; 
             end                           
 
             i_sub: begin                                   // sub
@@ -285,13 +241,11 @@ module riscv(
             end
 
             i_slt: begin                                   // slt
-              if ($signed(a) < $signed(b)) 
-                  alu_out = 1; 
+              if ($signed(a) < $signed(b)) alu_out = 1; 
             end
 
             i_sltu: begin                                  // sltu
-              if ({1'b0,a} < {1'b0,b}) 
-                alu_out = 1; 
+              if ({1'b0,a} < {1'b0,b}) alu_out = 1; 
             end
 
             i_addi: begin                                  // addi
@@ -315,9 +269,8 @@ module riscv(
             end
 
             i_slti: begin                                  // slti
-              if ($signed(a) < $signed(simm)) 
-                alu_out = 1; 
-                end
+              if ($signed(a) < $signed(simm)) alu_out = 1; 
+            end
 
             i_sltiu: begin                                 // sltiu
               if ({1'b0,a} < {1'b0,simm}) 
@@ -383,33 +336,33 @@ module riscv(
             end
 
             i_beq: begin                                   // beq
-              if (a == b) 
-                next_pc = pc + broffset; 
+              if (a == b) alu_out = 1;
+              jump_address = pc + broffset; 
             end
 
             i_bne: begin                                   // bne
-              if (a != b) 
-                next_pc = pc + broffset; 
+              if (a != b) alu_out = 1;
+              jump_address = pc + broffset; 
             end
 
             i_blt: begin                                   // blt
-              if ($signed(a) < $signed(b)) 
-                next_pc = pc + broffset; 
+              if ($signed(a) < $signed(b)) alu_out = 1;
+              jump_address = pc + broffset; 
             end
 
             i_bge: begin                                   // bge
-              if ($signed(a) >= $signed(b)) 
-                next_pc = pc + broffset; 
+              if ($signed(a) >= $signed(b)) alu_out = 1;
+              jump_address = pc + broffset; 
             end
 
             i_bltu: begin                                  // bltu
-              if ({1'b0,a} < {1'b0,b}) 
-                next_pc = pc + broffset; 
+              if ({1'b0,a} < {1'b0,b}) alu_out = 1;
+              jump_address = pc + broffset; 
             end
 
             i_bgeu: begin                                  // bgeu
-              if ({1'b0,a} >= {1'b0,b}) 
-                next_pc = pc + broffset; 
+              if ({1'b0,a} >= {1'b0,b}) alu_out = 1;
+              jump_address = pc + broffset; 
             end
 
             i_auipc: begin                                 // auipc
@@ -425,17 +378,89 @@ module riscv(
             i_jal: begin                                   
               alu_out = pc_plus_4;                       // set pc+4 to link register
               write_back = 1;
-              next_pc = pc + jaloffset; 
+              jump_address = pc + jaloffset; 
             end
 
             i_jalr: begin                                  
               alu_out = pc_plus_4;                       // set pc+4 to link register
               write_back = 1;
-              next_pc = (a + simm) & 32'hfffffffe; 
+              jump_address = (a + simm) & 32'hfffffffe; 
             end
 
             default:;
  
         endcase
     end
+
+
+    // load/store       
+    always_comb begin
+        mem_out = 32'b0;        
+        case (rmem) 
+            4'b0001:begin
+                mem_out = {24'h0, mem[mem_addr+0]};
+            end 
+            4'b1001:begin
+                mem_out = {{24{mem[mem_addr+0][7]}}, mem[mem_addr+0]};  
+            end
+            4'b0010:begin
+                mem_out = {16'h0, mem[mem_addr+1], mem[mem_addr+0]}; 
+            end
+            4'b1010:begin
+                mem_out = {{16{mem[mem_addr+1][7]}}, mem[mem_addr+1], mem[mem_addr+0]};  
+            end
+            4'b0100:begin
+                mem_out = {mem[mem_addr + 3], mem[mem_addr+2], mem[mem_addr+1], mem[mem_addr+0]};
+    
+            end
+            default:;
+        endcase
+    end
+    
+    always_ff@(posedge clk)begin
+        case(wmem)
+          4'b0001:begin
+            mem[mem_addr + 0] <= store_data[7:0];
+          end
+          4'b0010:begin
+            mem[mem_addr + 0] <= store_data[7:0];
+          end
+          4'b0100:begin
+            mem[mem_addr + 0] <= store_data[7:0];
+          end
+          4'b1000:begin
+            mem[mem_addr + 0] <= store_data[7:0];
+          end
+          4'b0011:begin
+            mem[mem_addr + 0] <= store_data[7:0];
+            mem[mem_addr + 1] <= store_data[15:8];
+          end
+          4'b1100:begin
+            mem[mem_addr + 0] <= store_data[7:0];
+            mem[mem_addr + 1] <= store_data[15:8];
+          
+          end
+          4'b1111:begin
+            mem[mem_addr + 0] <= store_data[7:0];
+            mem[mem_addr + 1] <= store_data[15:8];
+            mem[mem_addr + 2] <= store_data[23:16];
+            mem[mem_addr + 3] <= store_data[31:24];
+          end
+          default:;
+        endcase
+      
+    end
+    
+    
+    wire        load = i_lw | i_lb | i_lbu | i_lh | i_lhu;     
+    wire [31:0] write_back_data = load ? mem_out : alu_out;
+
+    
+    // write back
+    always_ff @ (posedge clk) begin
+        if (write_back && (rd != 0)) begin                 // rd = 0 is zero register, so cannot write back.
+            regfile[rd] <= write_back_data;                 
+        end
+    end
+
 endmodule
