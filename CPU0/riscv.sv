@@ -73,7 +73,7 @@ module riscv(
 
           
     wire [31:0] pc_plus_4 = pc + 4; // pc + 4
-    wire [31:0] next_pc = ((i_beq | i_bne | i_blt | i_bge | i_bltu | i_bgeu) & alu_out) | i_jal | i_jalr ? jump_address : pc_plus_4;
+    wire [31:0] next_pc = ((i_beq | i_bne | i_blt | i_bge | i_bltu | i_bgeu) & (alu_out == 1)) | i_jal | i_jalr ? jump_address : pc_plus_4;
     
     // pc
     always_ff @ (posedge clk) begin
