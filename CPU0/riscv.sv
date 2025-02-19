@@ -85,12 +85,12 @@ module riscv(
     assign inst = {mem[pc+3], mem[pc+2], mem[pc+1], mem[pc+0]};
 
     // decode
-    wire [6:0] opcode = inst[6:0];   //
-    wire [2:0] funct3  = inst[14:12]; //
-    wire [6:0] funct7  = inst[31:25]; //
-    wire [4:0] rd     = inst[11:7];  //
-    wire [4:0] rs     = inst[19:15]; // = rs1
-    wire [4:0] rt     = inst[24:20]; // = rs2
+    wire [6:0] opcode = inst[6:0];  
+    wire [2:0] funct3  = inst[14:12]; 
+    wire [6:0] funct7  = inst[31:25]; 
+    wire [4:0] rd     = inst[11:7];  
+    wire [4:0] rs1     = inst[19:15]; 
+    wire [4:0] rs2     = inst[24:20]; 
     wire [4:0] shamt  = inst[24:20]; // == rs2;
     wire sign   = inst[31];
     wire [11:0] imm    = inst[31:20];
@@ -145,6 +145,11 @@ module riscv(
     wire i_or    = (opcode == 7'b0110011) & (funct3 == 3'b110) & (funct7 == 7'b0000000);
     wire i_and   = (opcode == 7'b0110011) & (funct3 == 3'b111) & (funct7 == 7'b0000000);
     
+    wire i_fence  = (opcode == 7'b0001111) & (rd == 5'b00000) & (funct3 == 3'b000) & (rs1 == 5'b00000) & (inst[31:28] == 4'b0000);
+    wire i_fencei = (opcode == 7'b0001111) & (rd == 5'b00000) & (funct3 == 3'b001) & (rs1 == 5'b00000) & (imm == 12'b000000000000);
+    wire i_ecall  = (opcode == 7'b1110011) & (rd == 5'b00000) & (funct3 == 3'b000) & (rs1 == 5'b00000) & (imm == 12'b000000000000);
+    wire i_ebreak = (opcode == 7'b1110011) & (rd == 5'b00000) & (funct3 == 3'b000) & (rs1 == 5'b00000) & (imm == 12'b000000000001);
+   
     // rv32 zicsr
     wire i_csrrw  = (opcode == 7'b1110011) && (funct3 == 3'b001);
     wire i_csrrs  = (opcode == 7'b1110011) && (funct3 == 3'b010);
@@ -167,8 +172,8 @@ module riscv(
 
     reg    [31:0] regfile [1:31];                          //  regfile[0] is zero register.
    
-    wire   [31:0] a = (rs==0) ? 0 : regfile[rs];           //  index 0 is zero register, so return 0. 
-    wire   [31:0] b = (rt==0) ? 0 : regfile[rt];           //  index 0 is zero register, so return 0.
+    wire   [31:0] a = (rs1==0) ? 0 : regfile[rs1];           //  index 0 is zero register, so return 0. 
+    wire   [31:0] b = (rs2==0) ? 0 : regfile[rs2];           //  index 0 is zero register, so return 0.
 
 
     // execute
