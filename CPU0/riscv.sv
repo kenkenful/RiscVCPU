@@ -33,22 +33,6 @@ module riscv(
     output reg uart_en;
     output reg [7:0] uart_tx_data;
     
-
-    wire [31:0] inst;           // instructin
-    reg [31:0] pc;              // program counter
-
-    reg [31:0] store_data;      // store data
-    reg [31:0] mem_addr;        // load/store address
-    
-    reg write_back;             // 
-    reg [3:0] wmem;             // write memory byte enables
-    reg [3:0] rmem;
-    reg [31:0] alu_out;         // alu output
-    reg [31:0] mem_out;         // mem output
-    
-    reg [31:0] jump_addr;
-    reg [1:0]  jump_type;     //   00: non jump     01: non conditional jump      10 : conditional jump
-
     // Distributed RAM
     //reg [31:0] mem [0:4095];  // instruction and data melmory
     
@@ -71,7 +55,10 @@ module riscv(
         end
         $fclose(fd);      
     end
-
+    
+    reg [31:0] pc;              // program counter
+    reg [31:0] jump_addr;
+    reg [1:0]  jump_type;     //   00: non jump     01: non conditional jump      10 : conditional jump
           
     wire [31:0] pc_plus_4 = pc + 4; // pc + 4
     wire [31:0] next_pc = (jump_type == 2'b00) ? pc_plus_4 : jump_addr;
@@ -83,7 +70,7 @@ module riscv(
     end
     
     // fetch
-    assign inst = {mem[pc+3], mem[pc+2], mem[pc+1], mem[pc+0]};
+     wire [31:0] inst = {mem[pc+3], mem[pc+2], mem[pc+1], mem[pc+0]};
 
     // decode
     wire [6:0] opcode = inst[6:0];  
@@ -176,10 +163,21 @@ module riscv(
     wire   [31:0] a = (rs1==0) ? 0 : regfile[rs1];           //  index 0 is zero register, so return 0. 
     wire   [31:0] b = (rs2==0) ? 0 : regfile[rs2];           //  index 0 is zero register, so return 0.
 
+
+    
+    // execute
+    reg [31:0] store_data;      // store data
+    reg [31:0] mem_addr;        // load/store address
+    reg [3:0] wmem;             // write memory byte enables
+    reg [3:0] rmem;
+    
     reg [63:0] mul;   
     reg is_load;
-
-    // execute
+    reg is_store;
+    
+    reg write_back;             // 
+    reg [31:0] alu_out;         // alu output
+    
     always_comb begin                                      
         alu_out = 0;                                       // alu output
         mem_addr  = 0;                                     // memory address
@@ -192,6 +190,7 @@ module riscv(
         jump_addr = 0;
         mul = 0;
         is_load = 0;
+        is_store = 0;
         jump_type = 0;
         
         case (1'b1)
@@ -331,23 +330,26 @@ module riscv(
               alu_out = a + stimm;
               mem_addr  = alu_out;
               wmem    = 4'b0001 << alu_out[1:0];         // Which Byte position is it sorted to?
+              is_store = 1'b1;
+              
               if(mem_addr == `UART_TX_ADDR) begin
                    uart_en = 1'b1;
                    uart_tx_data = store_data[7:0];
               end
-              
             end
 
             i_sh: begin                                    // 2 bytes store
               alu_out = a + stimm;
               mem_addr  = {alu_out[31:1], 1'b0};           // alu_out[0] != 0, exception
-              wmem = 4'b0011 << {alu_out[1], 1'b0};   // Which Byte position is it sorted to?
+              wmem = 4'b0011 << {alu_out[1], 1'b0};        // Which Byte position is it sorted to?
+              is_store = 1'b1;
             end
 
             i_sw: begin                                    // 4 bytes store
               alu_out = a + stimm;
-              mem_addr  = {alu_out[31:2], 2'b00};           // alu_out[1:0] != 0, exception
-              wmem = 4'b1111;                         // Which Byte position is it sorted to?
+              mem_addr  = {alu_out[31:2], 2'b00};          // alu_out[1:0] != 0, exception
+              wmem = 4'b1111;                              // Which Byte position is it sorted to?
+              is_store = 1'b1;
             end
 
             i_beq: begin                                   // beq
@@ -473,6 +475,8 @@ module riscv(
 
 
     // load
+    reg [31:0] mem_out;         // mem output
+
     always_comb begin
         mem_out = 32'b0;        
         case (rmem) 
