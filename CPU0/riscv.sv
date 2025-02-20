@@ -74,7 +74,7 @@ module riscv(
 
           
     wire [31:0] pc_plus_4 = pc + 4; // pc + 4
-    wire [31:0] next_pc = jump_type == 2'b00 ? pc_plus_4 : jump_addr;
+    wire [31:0] next_pc = (jump_type == 2'b00) ? pc_plus_4 : jump_addr;
     
     // pc
     always_ff @ (posedge clk) begin
