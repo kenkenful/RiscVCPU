@@ -34,34 +34,47 @@ module riscv(
     output reg [7:0] uart_tx_data;
     
     // Distributed RAM
-    //reg [31:0] mem [0:4095];  // instruction and data melmory
+    localparam data_width = 32;
+    localparam addr_width = 14;
+     
+    reg [data_width-1:0] mem [2**addr_width-1:0];  // instruction and data melmory
     
     // Block RAM
     //(* ram_style = "block" *)reg [31:0] mem [0:16383];  // instruction and data melmory
-    reg [7:0] mem [0:32767];  // instruction and data melmory
     
-    initial begin
-        integer num = 0;
+    //initial begin
+    //    integer num = 0;
+    //    integer i = 0;
+    //    reg[7:0] dat;
+    //    integer fd = $fopen("/home/ttt/Desktop/soft/test.bin", "rb");
+    //    while($feof(fd)===0) begin
+    //        num = $fread(dat, fd);
+    //        if(num == 1)begin
+    //            mem[i] = dat;
+    //            $display( "memory read data: %x, %d", mem[i], num);
+    //            i = i+1;
+    //        end
+    //    end
+    //    $fclose(fd);      
+    //end
+    
+    initial begin 
         integer i = 0;
-        reg[7:0] dat;
-        integer fd = $fopen("/home/ttt/Desktop/soft/test.bin", "rb");
-        while($feof(fd)===0) begin
-            num = $fread(dat, fd);
-            if(num == 1)begin
-                mem[i] = dat;
-                $display( "memory read data: %x, %d", mem[i], num);
-                i = i+1;
-            end
-        end
-        $fclose(fd);      
+        $readmemh("/home/ttt/Desktop/soft/test.hex", mem);
+        
+        for(i=0; i<100; i=i+1)begin
+                   $display( "%x: %x",i*4, mem[i]);
+        end 
+
     end
     
+
     reg [31:0] pc;              // program counter
     reg [31:0] jump_addr;
     reg [1:0]  jump_type;     //   00: non jump     01: non conditional jump      10 : conditional jump
           
-    wire [31:0] pc_plus_4 = pc + 4; // pc + 4
-    wire [31:0] next_pc = (jump_type == 2'b00) ? pc_plus_4 : jump_addr;
+    wire [31:0] pc_plus = pc + 4;
+    wire [31:0] next_pc = (jump_type == 2'b00) ? pc_plus : jump_addr;
     
     // pc
     always_ff @ (posedge clk) begin
@@ -70,7 +83,7 @@ module riscv(
     end
     
     // fetch
-     wire [31:0] inst = {mem[pc+3], mem[pc+2], mem[pc+1], mem[pc+0]};
+    wire [31:0] inst = mem[pc[31:2]];
 
     // decode
     wire [6:0] opcode = inst[6:0];  
@@ -156,20 +169,16 @@ module riscv(
     wire i_rem    = (opcode == 7'b0110011) && (funct3 == 3'b110) && (funct7 == 7'b0000001);
     wire i_remu   = (opcode == 7'b0110011) && (funct3 == 3'b111) && (funct7 == 7'b0000001);
 
-
-
     reg    [31:0] regfile [1:31];                          //  regfile[0] is zero register.
    
     wire   [31:0] a = (rs1==0) ? 0 : regfile[rs1];           //  index 0 is zero register, so return 0. 
     wire   [31:0] b = (rs2==0) ? 0 : regfile[rs2];           //  index 0 is zero register, so return 0.
-
-
     
     // execute
     reg [31:0] store_data;      // store data
     reg [31:0] mem_addr;        // load/store address
     reg [3:0] wmem;             // write memory byte enables
-    reg [3:0] rmem;
+    reg [4:0] rmem;
     
     reg [63:0] mul;   
     reg is_load;
@@ -288,51 +297,51 @@ module riscv(
 
             i_lw: begin                                    // load 4bytes
               alu_out = a + simm;                        
-              mem_addr  = {alu_out[31:2], 2'b00};          // alu_out[1:0] != 0, exception
+              mem_addr  = {2'b0, alu_out[31:2]};
+              rmem = 5'b01111;                             
               write_back = 1;
-              rmem = 4'b0100;                             // signed 2bytes 
               is_load = 1'b1;                       
             end               
 
             i_lbu: begin                                   // load 1byte unsigned
               alu_out = a + simm;                        
-              mem_addr  = alu_out;
+              mem_addr  = {2'b0, alu_out[31:2]};              
+              rmem = 5'b00001 << alu_out[1:0];
               write_back = 1;
-              rmem = 4'b0001;                              // unsigned 1byte  
               is_load = 1'b1;                     
             end
 
             i_lb: begin                                     // load 1byte
               alu_out = a + simm;                         
-              mem_addr  = alu_out;                         
+              mem_addr  = {2'b0, alu_out[31:2]};
+              rmem = (5'b00001 << alu_out[1:0]) | 5'b10000;
               write_back = 1; 
-              rmem = 4'b1001;                              // signed 1byte    
               is_load = 1'b1;                   
             end
 
             i_lhu: begin                                    // load 2bytes unsigned
               alu_out = a + simm;                         
-              mem_addr  = {alu_out[31:1], 1'b0};             // alu_out[0] != 0, exception
+              mem_addr  = {2'b0, alu_out[31:2]};
+              rmem = 5'b00011 << {alu_out[1],1'b0}; 
               write_back = 1; 
-              rmem = 4'b0010;                              // unsigned 2bytes    
               is_load = 1'b1;                   
             end
 
             i_lh: begin                                     // load 2bytes 
               alu_out = a + simm;                         
-              mem_addr  = {alu_out[31:1],1'b0};             // alu_out[0] != 0, exception
+              mem_addr  = {2'b0, alu_out[31:2]};
+              rmem = (5'b00011 << {alu_out[1],1'b0}) | 5'b10000; 
               write_back = 1; 
-              rmem = 4'b1010;                              // signed 2bytes      
               is_load = 1'b1;                 
             end
 
             i_sb: begin                                    // 1 byte store
               alu_out = a + stimm;
-              mem_addr  = alu_out;
-              wmem    = 4'b0001 << alu_out[1:0];         // Which Byte position is it sorted to?
+              mem_addr  = {2'b0, alu_out[31:2]};
+              wmem    = 4'b0001 << alu_out[1:0];         // Which Byte position is it stored to?
               is_store = 1'b1;
               
-              if(mem_addr == `UART_TX_ADDR) begin
+              if(alu_out == `UART_TX_ADDR) begin
                    uart_en = 1'b1;
                    uart_tx_data = store_data[7:0];
               end
@@ -340,14 +349,14 @@ module riscv(
 
             i_sh: begin                                    // 2 bytes store
               alu_out = a + stimm;
-              mem_addr  = {alu_out[31:1], 1'b0};           // alu_out[0] != 0, exception
+              mem_addr  = {2'b0, alu_out[31:2]};
               wmem = 4'b0011 << {alu_out[1], 1'b0};        // Which Byte position is it sorted to?
               is_store = 1'b1;
             end
 
             i_sw: begin                                    // 4 bytes store
               alu_out = a + stimm;
-              mem_addr  = {alu_out[31:2], 2'b00};          // alu_out[1:0] != 0, exception
+              mem_addr  = {2'b0, alu_out[31:2]};
               wmem = 4'b1111;                              // Which Byte position is it sorted to?
               is_store = 1'b1;
             end
@@ -356,48 +365,50 @@ module riscv(
               if (a == b) begin
                 alu_out = 1;
                 jump_type = 2'b10;
+                jump_addr = pc + broffset; 
               end
-              jump_addr = pc + broffset; 
             end
 
             i_bne: begin                                   // bne
               if (a != b)begin
                alu_out = 1;
                jump_type = 2'b10;
+               jump_addr = pc + broffset; 
               end
-              jump_addr = pc + broffset; 
             end
 
             i_blt: begin                                   // blt
               if ($signed(a) < $signed(b))begin
                 alu_out = 1;
                 jump_type = 2'b10;
+                jump_addr = pc + broffset; 
               end
-              jump_addr = pc + broffset; 
             end
 
             i_bge: begin                                   // bge
               if ($signed(a) >= $signed(b))begin
                 alu_out = 1;
                 jump_type = 2'b10;
+                jump_addr = pc + broffset; 
               end
-              jump_addr = pc + broffset; 
             end
 
             i_bltu: begin                                  // bltu
               if ({1'b0,a} < {1'b0,b})begin
                 alu_out = 1;
                 jump_type = 2'b10;
+                jump_addr = pc + broffset;
               end
-              jump_addr = pc + broffset; 
+               
             end
 
             i_bgeu: begin                                  // bgeu
               if ({1'b0,a} >= {1'b0,b})begin
                  alu_out = 1;
                 jump_type = 2'b10;
+                jump_addr = pc + broffset;
                end
-              jump_addr = pc + broffset; 
+               
             end
 
             i_auipc: begin                                 // auipc
@@ -411,14 +422,14 @@ module riscv(
             end
 
             i_jal: begin                                   
-              alu_out = pc_plus_4;                       // set pc+4 to link register
+              alu_out = pc_plus;                       // set pc+4 to link register
               write_back = 1;
               jump_addr = pc + jaloffset; 
               jump_type = 2'b01;
             end
 
             i_jalr: begin                                  
-              alu_out = pc_plus_4;                       // set pc+4 to link register
+              alu_out = pc_plus;                       // set pc+4 to link register
               write_back = 1;
               jump_addr = (a + simm) & 32'hfffffffe; 
               jump_type = 2'b01;
@@ -475,26 +486,54 @@ module riscv(
 
 
     // load
-    reg [31:0] mem_out;         // mem output
+    reg [31:0] mem_out;  
 
     always_comb begin
         mem_out = 32'b0;        
         case (rmem) 
-            4'b0001:begin
-                mem_out = {24'h0, mem[mem_addr+0]};
+            // unsgigned 1 byte
+            5'b00001:begin
+                mem_out = {24'h0, mem[mem_addr][7:0]};
+            end
+            5'b00010:begin
+                mem_out = {24'h0, mem[mem_addr][15:8]};
+            end
+            5'b00100:begin
+                mem_out = {24'h0, mem[mem_addr][23:16]};
+            end
+            5'b01000:begin
+              mem_out = {24'h0, mem[mem_addr][31:24]};
             end 
-            4'b1001:begin
-                mem_out = {{24{mem[mem_addr+0][7]}}, mem[mem_addr+0]};  
+            // signed 1 byte
+            5'b10001:begin
+                mem_out = {{24{mem[mem_addr][7]}}, mem[mem_addr][7:0]};
             end
-            4'b0010:begin
-                mem_out = {16'h0, mem[mem_addr+1], mem[mem_addr+0]}; 
+            5'b10010:begin
+                mem_out = {{24{mem[mem_addr][15]}}, mem[mem_addr][15:8]};
             end
-            4'b1010:begin
-                mem_out = {{16{mem[mem_addr+1][7]}}, mem[mem_addr+1], mem[mem_addr+0]};  
+            5'b10100:begin
+                mem_out = {{24{mem[mem_addr][23]}}, mem[mem_addr][23:16]};
             end
-            4'b0100:begin
-                mem_out = {mem[mem_addr + 3], mem[mem_addr+2], mem[mem_addr+1], mem[mem_addr+0]};
-    
+            5'b11000:begin
+                mem_out = {{24{mem[mem_addr][31]}}, mem[mem_addr][31:24]};
+            end 
+            // unsigned 2 bytes
+            5'b00011:begin
+                mem_out = {16'b0, mem[mem_addr][15:0]};  
+            end
+            5'b01100:begin
+                mem_out = {16'h0, mem[mem_addr][31:16]}; 
+            end
+            // signed 2 bytes
+            5'b10011:begin
+                mem_out = {{16{mem[mem_addr][15]}}, mem[mem_addr][15:0]};  
+            end
+            5'b11100:begin
+                mem_out = {{16{mem[mem_addr][31]}}, mem[mem_addr][31:16]}; 
+            end
+            // 4 bytes
+            5'b01111:begin
+                mem_out = mem[mem_addr];
             end
             default:;
         endcase
@@ -504,35 +543,28 @@ module riscv(
     always_ff@(posedge clk)begin
         case(wmem)
           4'b0001:begin
-            mem[mem_addr + 0] <= store_data[7:0];
+            mem[mem_addr] <= {24'b0, store_data[7:0]};
           end
           4'b0010:begin
-            mem[mem_addr + 0] <= store_data[7:0];
+            mem[mem_addr] <= {16'b0, store_data[7:0], 8'b0};
           end
           4'b0100:begin
-            mem[mem_addr + 0] <= store_data[7:0];
+            mem[mem_addr] <= {8'b0, store_data[7:0], 16'b0};
           end
           4'b1000:begin
-            mem[mem_addr + 0] <= store_data[7:0];
+            mem[mem_addr] <= {store_data[7:0], 24'b0};
           end
           4'b0011:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-            mem[mem_addr + 1] <= store_data[15:8];
+            mem[mem_addr] <= {16'b0, store_data[15:0]};
           end
           4'b1100:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-            mem[mem_addr + 1] <= store_data[15:8];
-          
+            mem[mem_addr] <= {store_data[15:0],16'b0};    
           end
           4'b1111:begin
-            mem[mem_addr + 0] <= store_data[7:0];
-            mem[mem_addr + 1] <= store_data[15:8];
-            mem[mem_addr + 2] <= store_data[23:16];
-            mem[mem_addr + 3] <= store_data[31:24];
+            mem[mem_addr] <= store_data[31:0];
           end
           default:;
         endcase
-      
     end
     
     wire [31:0] write_back_data = is_load ? mem_out : alu_out;
