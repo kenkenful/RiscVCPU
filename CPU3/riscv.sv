@@ -60,7 +60,6 @@ module riscv(
         .inst(inst)
     );
     
-    
     dmem dmem0(
         .clk(clk),
         .wmem(wmem),
