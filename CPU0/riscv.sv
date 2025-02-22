@@ -486,54 +486,54 @@ module riscv(
 
 
     // load
-    reg [31:0] mem_out;  
+    reg [31:0] load_data;  
 
     always_comb begin
-        mem_out = 32'b0;        
+        load_data = 32'b0;        
         case (rmem) 
             // unsgigned 1 byte
             5'b00001:begin
-                mem_out = {24'h0, mem[mem_addr][7:0]};
+                load_data = {24'h0, mem[mem_addr][7:0]};
             end
             5'b00010:begin
-                mem_out = {24'h0, mem[mem_addr][15:8]};
+                load_data = {24'h0, mem[mem_addr][15:8]};
             end
             5'b00100:begin
-                mem_out = {24'h0, mem[mem_addr][23:16]};
+                load_data = {24'h0, mem[mem_addr][23:16]};
             end
             5'b01000:begin
-              mem_out = {24'h0, mem[mem_addr][31:24]};
+                load_data = {24'h0, mem[mem_addr][31:24]};
             end 
             // signed 1 byte
             5'b10001:begin
-                mem_out = {{24{mem[mem_addr][7]}}, mem[mem_addr][7:0]};
+                load_data = {{24{mem[mem_addr][7]}}, mem[mem_addr][7:0]};
             end
             5'b10010:begin
-                mem_out = {{24{mem[mem_addr][15]}}, mem[mem_addr][15:8]};
+                load_data = {{24{mem[mem_addr][15]}}, mem[mem_addr][15:8]};
             end
             5'b10100:begin
-                mem_out = {{24{mem[mem_addr][23]}}, mem[mem_addr][23:16]};
+                load_data = {{24{mem[mem_addr][23]}}, mem[mem_addr][23:16]};
             end
             5'b11000:begin
-                mem_out = {{24{mem[mem_addr][31]}}, mem[mem_addr][31:24]};
+                load_data = {{24{mem[mem_addr][31]}}, mem[mem_addr][31:24]};
             end 
             // unsigned 2 bytes
             5'b00011:begin
-                mem_out = {16'b0, mem[mem_addr][15:0]};  
+                load_data = {16'b0, mem[mem_addr][15:0]};  
             end
             5'b01100:begin
-                mem_out = {16'h0, mem[mem_addr][31:16]}; 
+                load_data = {16'h0, mem[mem_addr][31:16]}; 
             end
             // signed 2 bytes
             5'b10011:begin
-                mem_out = {{16{mem[mem_addr][15]}}, mem[mem_addr][15:0]};  
+                load_data = {{16{mem[mem_addr][15]}}, mem[mem_addr][15:0]};  
             end
             5'b11100:begin
-                mem_out = {{16{mem[mem_addr][31]}}, mem[mem_addr][31:16]}; 
+                load_data = {{16{mem[mem_addr][31]}}, mem[mem_addr][31:16]}; 
             end
             // 4 bytes
             5'b01111:begin
-                mem_out = mem[mem_addr];
+                load_data = mem[mem_addr];
             end
             default:;
         endcase
@@ -567,7 +567,7 @@ module riscv(
         endcase
     end
     
-    wire [31:0] write_back_data = is_load ? mem_out : alu_out;
+    wire [31:0] write_back_data = is_load ? load_data : alu_out;
 
     // write back
     always_ff @ (posedge clk) begin
