@@ -54,6 +54,7 @@ module riscv(
         else       pc <= next_pc;
     end
     
+    // fetch, store/load
     mem mem0(
         .clk(clk),
         .pc(pc),
@@ -65,9 +66,6 @@ module riscv(
         .load_data(load_data)
     );
     
-    // fetch
-    //wire [31:0] inst = mem[pc[31:2]];
-
     // decode
     wire [6:0] opcode = inst[6:0];  
     wire [2:0] funct3  = inst[14:12]; 
@@ -444,22 +442,22 @@ module riscv(
             end
             
             i_div:begin
-                alu_out = $signed($signed(rs1) / $signed(rs2));
+                alu_out = $signed($signed(a) / $signed(b));
                 write_back = 1;
             end
             
             i_divu:begin
-                alu_out = rs1 / rs2;
+                alu_out = a / b;
                 write_back = 1;
             end
             
             i_rem:begin
-                alu_out = $signed($signed(rs1) % $signed(rs2));
+                alu_out = $signed($signed(a) % $signed(b));
                 write_back = 1;
             end
             
             i_remu:begin
-                alu_out = rs1 % rs2;
+                alu_out = a % b;
                 write_back = 1;
             end
             default:;
