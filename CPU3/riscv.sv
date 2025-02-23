@@ -1,24 +1,3 @@
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 02/08/2025 09:32:41 AM
-// Design Name: 
-// Module Name: riscv
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 `define UART_TX_ADDR 32'h20020
 
 module riscv(
@@ -54,23 +33,12 @@ module riscv(
         else       pc <= next_pc;
     end
     
+    // fetch
     imem imem0(
         .clk(clk),
         .pc(pc),
         .inst(inst)
     );
-    
-    dmem dmem0(
-        .clk(clk),
-        .wmem(wmem),
-        .rmem(rmem),
-        .mem_addr(mem_addr),
-        .store_data(store_data),
-        .load_data(load_data)
-    );
-    
-    // fetch
-    //wire [31:0] inst = mem[pc[31:2]];
 
     // decode
     wire [6:0] opcode = inst[6:0];  
@@ -162,11 +130,6 @@ module riscv(
     wire   [31:0] b = (rs2==0) ? 0 : regfile[rs2];           //  index 0 is zero register, so return 0.
     
     // execute
-    //reg [31:0] store_data;      // store data
-    //reg [31:0] mem_addr;        // load/store address
-    //reg [3:0] wmem;             // write memory byte enables
-    //reg [4:0] rmem;
-    
     reg [63:0] mul;   
     reg is_load;
     reg is_store;
@@ -448,32 +411,42 @@ module riscv(
             end
             
             i_div:begin
-                alu_out = $signed($signed(rs1) / $signed(rs2));
+                alu_out = $signed($signed(a) / $signed(b));
                 write_back = 1;
             end
             
             i_divu:begin
-                alu_out = rs1 / rs2;
+                alu_out = a / b;
                 write_back = 1;
             end
             
             i_rem:begin
-                alu_out = $signed($signed(rs1) % $signed(rs2));
+                alu_out = $signed($signed(a) % $signed(b));
                 write_back = 1;
             end
             
             i_remu:begin
-                alu_out = rs1 % rs2;
+                alu_out = a % b;
                 write_back = 1;
             end
             default:;
  
         endcase
     end
+    
+    // store/load
+    dmem dmem0(
+        .clk(clk),
+        .wmem(wmem),
+        .rmem(rmem),
+        .mem_addr(mem_addr),
+        .store_data(store_data),
+        .load_data(load_data)
+    );
 
+    // write back	
     wire [31:0] write_back_data = is_load ? load_data : alu_out;
 
-    // write back
     always_ff @ (posedge clk) begin
         if (write_back && (rd != 0)) begin                 // rd = 0 is zero register, so cannot write back.
             regfile[rd] <= write_back_data;                 
