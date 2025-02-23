@@ -461,22 +461,22 @@ module riscv(
             end
             
             i_div:begin
-                alu_out = $signed($signed(rs1) / $signed(rs2));
+                alu_out = $signed($signed(a) / $signed(b));
                 write_back = 1;
             end
             
             i_divu:begin
-                alu_out = rs1 / rs2;
+                alu_out = a / b;
                 write_back = 1;
             end
             
             i_rem:begin
-                alu_out = $signed($signed(rs1) % $signed(rs2));
+                alu_out = $signed($signed(a) % $signed(b));
                 write_back = 1;
             end
             
             i_remu:begin
-                alu_out = rs1 % rs2;
+                alu_out = a % b;
                 write_back = 1;
             end
             default:;
