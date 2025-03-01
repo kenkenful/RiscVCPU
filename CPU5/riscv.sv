@@ -22,7 +22,7 @@ module riscv(
     reg [31:0] store_data;
     wire [31:0] load_data;
 
-    reg [31:0] pc;              // program counter
+    reg [31:0] pc;        
     reg [31:0] jump_addr;
     reg  is_jump;     
           
@@ -42,6 +42,7 @@ module riscv(
         .inst(inst)
     );
 
+    //FETCH/DECODE pipeline reg
     always_ff@(posedge clk)begin
       if(is_jump == 1)begin
         inst_de <= 0;
@@ -58,7 +59,7 @@ module riscv(
     reg [31:0] pc_de;
     reg [31:0] pc_plus_de;
 
-    // decode
+    // DECODE STAGE
     de_ex_pipeline_reg de;
 
     reg [6:0] opcode;
@@ -90,16 +91,14 @@ module riscv(
         de.a = (rs1==0) ? 0 : (is_load == 1 && ex.rd == rs1)? load_data : (write_back == 1 && ex.rd == rs1)? alu_out : regfile[rs1];           //  index 0 is zero register, so return 0. 
         de.b = (rs2==0) ? 0 : (is_load == 1 && ex.rd == rs2)? load_data : (write_back == 1 && ex.rd == rs2)? alu_out : regfile[rs2];           //  index 0 is zero register, so return 0.
 
-        de.broffset  = {{19{sign}},inst_de[31],inst_de[7],inst_de[30:25],inst_de[11:8],1'b0};
-        de.simm      = {{20{sign}},inst_de[31:20]};                                    // lw,  addi, slti, sltiu, xori, ori,  andi, jalr
-        de.stimm     = {{20{sign}},inst_de[31:25],inst_de[11:7]};                         // store word    memory address
+        de.broffset  = {{19{sign}}, inst_de[31], inst_de[7], inst_de[30:25], inst_de[11:8], 1'b0};
+        de.simm      = {{20{sign}}, inst_de[31:20]};                                    // lw,  addi, slti, sltiu, xori, ori,  andi, jalr
+        de.stimm     = {{20{sign}}, inst_de[31:25], inst_de[11:7]};                         // store word    memory address
         de.uimm      = {inst_de[31:12],12'h0};                                         // lui, auipc
 
         de.shamt     = inst_de[24:20]; // == rs2;
             
-        de.jaloffset = {{11{sign}},inst_de[31],inst_de[19:12],inst_de[20],inst_de[30:21],1'b0}; // jal
-         // jal target   31:21          20       19:12       11       10:1      0
-
+        de.jaloffset = {{11{sign}}, inst_de[31], inst_de[19:12], inst_de[20], inst_de[30:21], 1'b0}; // jal
 
         de.i_auipc  = (opcode == 7'b0010111);
         de.i_lui    = (opcode == 7'b0110111);
@@ -158,7 +157,7 @@ module riscv(
         de.i_remu   = (opcode == 7'b0110011) && (funct3 == 3'b111) && (funct7 == 7'b0000001);
     end
 
-    // decode/execute pipline register
+    // DECODE/EXECUTE pipline reg
 
     de_ex_pipeline_reg ex;
 
@@ -169,7 +168,7 @@ module riscv(
           ex <= de;
     end
 
-    // execute
+    // EXECUTE STATGE
 
     // output
     reg [63:0] mul;     
@@ -475,7 +474,7 @@ module riscv(
         endcase
     end
     
-    // store/load
+    // MEM STAGE
     dmem dmem0(
         .clk(clk),
         .wmem(wmem),
@@ -485,7 +484,7 @@ module riscv(
         .load_data(load_data)
     );
 
-    // write back
+    // WRITE BACK STAGE
     wire [31:0] write_back_data = is_load ? load_data : alu_out;
 
     always_ff @ (posedge clk) begin
