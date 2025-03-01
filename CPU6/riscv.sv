@@ -15,12 +15,7 @@ module riscv(
     output reg uart_en;
     output reg [7:0] uart_tx_data;
     
-    wire [31:0] inst;
-    reg [3:0] wmem;
-    reg [4:0] rmem;
-    reg [31:0] mem_addr;
-    reg [31:0] store_data;
-    wire [31:0] load_data;
+
 
     reg [31:0] pc;        
     reg [31:0] jump_addr;
@@ -40,23 +35,21 @@ module riscv(
         .clk(clk),
         .is_jump(is_jump),
         .pc(pc),
-        .inst(inst)
+        .inst(inst)   // FETCH/DECODE pipline
     );
 
     //FETCH/DECODE pipeline reg
     always_ff@(posedge clk)begin
       if(is_jump == 1)begin
-        inst_de <= 0;
         pc_de <= 0;
         pc_plus_de <= 0;
       end else begin
-        inst_de <= inst;
         pc_de <= pc;
         pc_plus_de <= pc_plus;
       end
     end
 
-    reg [31:0] inst_de;
+    reg [31:0] inst;
     reg [31:0] pc_de;
     reg [31:0] pc_plus_de;
 
@@ -75,31 +68,31 @@ module riscv(
     reg  [31:0] regfile [1:31];                          //  regfile[0] is zero register.
 
     always_comb begin
-        opcode    = inst_de[6:0];  
-        funct3    = inst_de[14:12];
-        funct7    = inst_de[31:25];
-        rd        = inst_de[11:7]; 
-        rs1       = inst_de[19:15];
-        rs2       = inst_de[24:20];
-        sign      = inst_de[31];
-        imm       = inst_de[31:20];
+        opcode    = inst[6:0];  
+        funct3    = inst[14:12];
+        funct7    = inst[31:25];
+        rd        = inst[11:7]; 
+        rs1       = inst[19:15];
+        rs2       = inst[24:20];
+        sign      = inst[31];
+        imm       = inst[31:20];
 
         de.pc = pc_de;
         de.pc_plus = pc_plus_de;
-        de.rd = inst_de[11:7];
+        de.rd = inst[11:7];
 
         // forwarding 
         de.a = (rs1==0) ? 0 : (is_load == 1 && ex.rd == rs1)? load_data : (write_back == 1 && ex.rd == rs1)? alu_out : regfile[rs1];           //  index 0 is zero register, so return 0. 
         de.b = (rs2==0) ? 0 : (is_load == 1 && ex.rd == rs2)? load_data : (write_back == 1 && ex.rd == rs2)? alu_out : regfile[rs2];           //  index 0 is zero register, so return 0.
 
-        de.broffset  = {{19{sign}}, inst_de[31], inst_de[7], inst_de[30:25], inst_de[11:8], 1'b0};
-        de.simm      = {{20{sign}}, inst_de[31:20]};                                    // lw,  addi, slti, sltiu, xori, ori,  andi, jalr
-        de.stimm     = {{20{sign}}, inst_de[31:25], inst_de[11:7]};                         // store word    memory address
-        de.uimm      = {inst_de[31:12],12'h0};                                         // lui, auipc
+        de.broffset  = {{19{sign}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
+        de.simm      = {{20{sign}}, inst[31:20]};                                    // lw,  addi, slti, sltiu, xori, ori,  andi, jalr
+        de.stimm     = {{20{sign}}, inst[31:25], inst[11:7]};                         // store word    memory address
+        de.uimm      = {inst[31:12],12'h0};                                         // lui, auipc
 
-        de.shamt     = inst_de[24:20]; // == rs2;
+        de.shamt     = inst[24:20]; // == rs2;
             
-        de.jaloffset = {{11{sign}}, inst_de[31], inst_de[19:12], inst_de[20], inst_de[30:21], 1'b0}; // jal
+        de.jaloffset = {{11{sign}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0}; // jal
 
         de.i_auipc  = (opcode == 7'b0010111);
         de.i_lui    = (opcode == 7'b0110111);
@@ -138,7 +131,7 @@ module riscv(
         de.i_sra    = (opcode == 7'b0110011) & (funct3 == 3'b101) & (funct7 == 7'b0100000);
         de.i_or     = (opcode == 7'b0110011) & (funct3 == 3'b110) & (funct7 == 7'b0000000);
         de.i_and    = (opcode == 7'b0110011) & (funct3 == 3'b111) & (funct7 == 7'b0000000);
-        de.i_fence  = (opcode == 7'b0001111) & (rd == 5'b00000) & (funct3 == 3'b000) & (rs1 == 5'b00000) & (inst_de[31:28] == 4'b0000);
+        de.i_fence  = (opcode == 7'b0001111) & (rd == 5'b00000) & (funct3 == 3'b000) & (rs1 == 5'b00000) & (inst[31:28] == 4'b0000);
         de.i_fencei = (opcode == 7'b0001111) & (rd == 5'b00000) & (funct3 == 3'b001) & (rs1 == 5'b00000) & (imm == 12'b000000000000);
         de.i_ecall  = (opcode == 7'b1110011) & (rd == 5'b00000) & (funct3 == 3'b000) & (rs1 == 5'b00000) & (imm == 12'b000000000000);
         de.i_ebreak = (opcode == 7'b1110011) & (rd == 5'b00000) & (funct3 == 3'b000) & (rs1 == 5'b00000) & (imm == 12'b000000000001);
@@ -177,6 +170,11 @@ module riscv(
     reg is_store;
     reg write_back;             
     reg [31:0] alu_out;         
+    reg [3:0] wmem;
+    reg [4:0] rmem;
+    reg [31:0] mem_addr;
+    reg [31:0] store_data;
+    wire [31:0] load_data;
     
     always_comb begin                                      
         alu_out = 0;                                             
