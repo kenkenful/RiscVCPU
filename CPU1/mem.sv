@@ -1,3 +1,5 @@
+`default_nettype none
+
 
 module mem(
     clk,
@@ -20,7 +22,7 @@ module mem(
     input wire [31:0] store_data;
     output reg [31:0] load_data;
     
-       // Distributed RAM
+    // Distributed RAM
     localparam data_width = 32;
     localparam addr_width = 12;
      
@@ -31,7 +33,7 @@ module mem(
     
     initial begin 
         integer i = 0;
-        $readmemh("/home/ttt/Desktop/soft/test.hex", mem);
+        $readmemh("/home/ttt/Desktop/riscv/RISCV/RISCV.srcs/sources_1/new/soft/test.hex", mem);
         
         for(i=0; i<100; i=i+1)begin
                    $display( "%x: %x",i*4, mem[i]);
@@ -42,7 +44,6 @@ module mem(
     
     // load
     always_comb begin
-        load_data = 32'b0;        
         case (rmem) 
             // unsgigned 1 byte
             5'b00001:begin

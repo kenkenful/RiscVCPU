@@ -1,3 +1,4 @@
+`default_nettype none
 
 `define UART_TX_ADDR 32'h20020
 
@@ -8,8 +9,8 @@ module riscv(
       uart_tx_data
     );
 
-    input wire clk;             // clock 
-    input wire reset;           // reset
+    input wire clk;             
+    input wire reset;           
     output reg uart_en;
     output reg [7:0] uart_tx_data;
     
@@ -21,12 +22,12 @@ module riscv(
     reg [31:0] store_data;
     wire [31:0] load_data;
 
-    reg [31:0] pc;              // program counter
+    reg [31:0] pc;            
     reg [31:0] jump_addr;
-    reg [1:0]  jump_type;     //   00: non jump     01: non conditional jump      10 : conditional jump
+    reg is_jump;     
           
     wire [31:0] pc_plus = pc + 4;
-    wire [31:0] next_pc = (jump_type == 2'b00) ? pc_plus : jump_addr;
+    wire [31:0] next_pc = (is_jump == 0) ? pc_plus : jump_addr;
     
     // pc
     always_ff @ (posedge clk) begin
@@ -53,21 +54,15 @@ module riscv(
     wire [4:0] rd     = inst[11:7];  
     wire [4:0] rs1     = inst[19:15]; 
     wire [4:0] rs2     = inst[24:20]; 
-    wire [4:0] shamt  = inst[24:20]; // == rs2;
+    wire [4:0] shamt  = inst[24:20];
     wire sign   = inst[31];
     wire [11:0] imm    = inst[31:20];
 
-    // branch offset            31:13          12      11       10:5         4:1     0
-    wire   [31:0] broffset  = {{19{sign}},inst[31],inst[7],inst[30:25],inst[11:8],1'b0};   // beq, bne,  blt,  bge,   bltu, bgeu
-    
-    wire   [31:0] simm      = {{20{sign}},inst[31:20]};                                    // lw,  addi, slti, sltiu, xori, ori,  andi, jalr
-    
-    wire   [31:0] stimm     = {{20{sign}},inst[31:25],inst[11:7]};                         // store word    memory address
-    
-    wire   [31:0] uimm      = {inst[31:12],12'h0};                                         // lui, auipc
-    
-    wire   [31:0] jaloffset = {{11{sign}},inst[31],inst[19:12],inst[20],inst[30:21],1'b0}; // jal
-    // jal target               31:21          20       19:12       11       10:1      0
+    wire   [31:0] broffset  = {{19{sign}},inst[31],inst[7],inst[30:25],inst[11:8],1'b0};   
+    wire   [31:0] simm      = {{20{sign}},inst[31:20]};                                    
+    wire   [31:0] stimm     = {{20{sign}},inst[31:25],inst[11:7]};                         
+    wire   [31:0] uimm      = {inst[31:12],12'h0};                                         
+    wire   [31:0] jaloffset = {{11{sign}},inst[31],inst[19:12],inst[20],inst[30:21],1'b0}; 
 
     wire i_auipc = (opcode == 7'b0010111);
     wire i_lui   = (opcode == 7'b0110111);
@@ -135,33 +130,28 @@ module riscv(
     wire   [31:0] a = (rs1==0) ? 0 : regfile[rs1];           //  index 0 is zero register, so return 0. 
     wire   [31:0] b = (rs2==0) ? 0 : regfile[rs2];           //  index 0 is zero register, so return 0.
     
-    // execute
-    //reg [31:0] store_data;      // store data
-    //reg [31:0] mem_addr;        // load/store address
-    //reg [3:0] wmem;             // write memory byte enables
-    //reg [4:0] rmem;
-    
+    // execute    
     reg [63:0] mul;   
     reg is_load;
     reg is_store;
     
-    reg write_back;             // 
-    reg [31:0] alu_out;         // alu output
+    reg write_back;             
+    reg [31:0] alu_out;        
     
     always_comb begin                                      
-        alu_out = 0;                                       // alu output
-        mem_addr  = 0;                                     // memory address
-        write_back = 0;                                    // write regfile
-        wmem = 0;                                    // write memory (sw)
+        alu_out = 0;        
+        mem_addr  = 0;      
+        write_back = 0;     
+        wmem = 0;           
         rmem = 0;
-        store_data = b;                                    // store data
+        store_data = b;     
         uart_en = 0;
         uart_tx_data = 0;
         jump_addr = 0;
         mul = 0;
         is_load = 0;
         is_store = 0;
-        jump_type = 0;
+        is_jump = 0;
         
         case (1'b1)
             i_add: begin                                   // add
@@ -325,7 +315,7 @@ module riscv(
             i_beq: begin                                   // beq
               if (a == b) begin
                 alu_out = 1;
-                jump_type = 2'b10;
+                is_jump = 1;
                 jump_addr = pc + broffset; 
               end
             end
@@ -333,7 +323,7 @@ module riscv(
             i_bne: begin                                   // bne
               if (a != b)begin
                alu_out = 1;
-               jump_type = 2'b10;
+               is_jump = 1;
                jump_addr = pc + broffset; 
               end
             end
@@ -341,7 +331,7 @@ module riscv(
             i_blt: begin                                   // blt
               if ($signed(a) < $signed(b))begin
                 alu_out = 1;
-                jump_type = 2'b10;
+                is_jump = 1;
                 jump_addr = pc + broffset; 
               end
             end
@@ -349,7 +339,7 @@ module riscv(
             i_bge: begin                                   // bge
               if ($signed(a) >= $signed(b))begin
                 alu_out = 1;
-                jump_type = 2'b10;
+                is_jump = 1;
                 jump_addr = pc + broffset; 
               end
             end
@@ -357,7 +347,7 @@ module riscv(
             i_bltu: begin                                  // bltu
               if ({1'b0,a} < {1'b0,b})begin
                 alu_out = 1;
-                jump_type = 2'b10;
+                is_jump = 1;
                 jump_addr = pc + broffset;
               end
                
@@ -365,8 +355,8 @@ module riscv(
 
             i_bgeu: begin                                  // bgeu
               if ({1'b0,a} >= {1'b0,b})begin
-                 alu_out = 1;
-                jump_type = 2'b10;
+                alu_out = 1;
+                is_jump = 1;
                 jump_addr = pc + broffset;
                end
                
@@ -386,14 +376,14 @@ module riscv(
               alu_out = pc_plus;                       // set pc+4 to link register
               write_back = 1;
               jump_addr = pc + jaloffset; 
-              jump_type = 2'b01;
+              is_jump = 1;
             end
 
             i_jalr: begin                                  
               alu_out = pc_plus;                       // set pc+4 to link register
               write_back = 1;
               jump_addr = (a + simm) & 32'hfffffffe; 
-              jump_type = 2'b01;
+              is_jump = 1;
             end
             
             i_mul: begin
