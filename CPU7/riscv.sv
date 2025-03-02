@@ -87,10 +87,9 @@ module riscv(
         sign      = inst[31];
         imm       = inst[31:20];
         
-        rs1_de    = inst[19:15];
-        rs2_de    = inst[24:20];
-        rd_de     = inst[11:7];
-
+        rs1_de       = inst[19:15];
+        rs2_de       = inst[24:20];
+        rd_de        = inst[11:7];
         broffset_de  = {{19{sign}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
         simm_de      = {{20{sign}}, inst[31:20]};                                   
         stimm_de     = {{20{sign}}, inst[31:25], inst[11:7]};                        
@@ -98,12 +97,9 @@ module riscv(
         shamt_de     = inst[24:20]; // == rs2_de;
         jaloffset_de = {{11{sign}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0}; // jal
 
-
         // forwarding 
         a_de = (rs1_de == 0) ? 0 : (is_load_wb && rd_wb == rs1_de) ? load_data_wb : (is_write_back_wb && rd_wb == rs1_de) ? alu_out_wb : regfile[rs1_de]; 
         b_de = (rs2_de == 0) ? 0 : (is_load_wb && rd_wb == rs2_de) ? load_data_wb : (is_write_back_wb && rd_wb == rs2_de) ? alu_out_wb : regfile[rs2_de];  
-
-
 
         de.i_auipc  = (opcode == 7'b0010111);
         de.i_lui    = (opcode == 7'b0110111);
@@ -257,6 +253,7 @@ module riscv(
         is_jump = 0;
         is_stoll = 0;
 
+        // forwarding 
         a = (is_load_wb && rd_wb == rs1_ex) ? load_data_wb : (is_write_back_wb && rd_wb == rs1_ex) ? alu_out_wb : a_ex;
         b = (is_load_wb && rd_wb == rs2_ex) ? load_data_wb : (is_write_back_wb && rd_wb == rs2_ex) ? alu_out_wb : b_ex;
 
