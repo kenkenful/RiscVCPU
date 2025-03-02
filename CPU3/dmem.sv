@@ -1,3 +1,4 @@
+`default_nettype none
 
 module dmem(
     clk,
@@ -25,7 +26,7 @@ module dmem(
     
     initial begin 
         integer i = 0;
-        $readmemh("/home/ttt/Desktop/soft/data.hex", mem);
+        $readmemh("/home/ttt/Desktop/riscv/RISCV/RISCV.srcs/sources_1/new/soft/data.hex", mem);
         
         for(i=0; i<100; i=i+1)begin
                    $display( "%x: %x",i*4, mem[i]);
@@ -40,7 +41,6 @@ module dmem(
     end
     
     always_comb begin
-        load_data = 0;
         case (rmem) 
         // unsgigned 1 byte
         5'b00001:begin
