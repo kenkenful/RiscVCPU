@@ -3,12 +3,14 @@
 module imem(
    clk,
    is_jump,
+   is_stoll,
     pc,
     inst
 );
     
     input wire clk;
     input wire is_jump;
+    input wire is_stoll;
     input wire [31:0] pc;
     output reg [31:0] inst;
 
@@ -31,10 +33,12 @@ module imem(
     end
 
     always_ff@(posedge clk)begin
-        if(is_jump == 1)
-            inst = 0;
+        if(is_jump)
+            inst <= 0;
+        else if(is_stoll)
+            inst <= inst;
         else
-            inst = mem[pc[31:2]];
+            inst <= mem[pc[31:2]];
 
     end
  

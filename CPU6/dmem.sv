@@ -37,7 +37,7 @@ module dmem(
     
     // load
     always_ff@(negedge clk) begin
-        mem_out = mem[mem_addr];
+      mem_out = mem[mem_addr];
     end
     
     always_comb begin

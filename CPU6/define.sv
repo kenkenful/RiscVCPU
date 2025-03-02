@@ -1,21 +1,7 @@
 `ifndef _define_
 `define _define_
 
-
 typedef struct packed{
-    reg [31:0]  a;
-    reg [31:0]  b;
-    reg [31:0]  jaloffset;
-    reg [31:0]  broffset;
-    reg [4:0]   shamt; 
-    reg [31:0]  simm;
-    reg [31:0]  uimm; 
-    reg [31:0]  stimm; 
-
-    reg [31:0] pc;
-    reg [31:0] pc_plus;
-    reg [4:0]  rd;
-
     reg i_auipc ;
     reg i_lui   ;
     reg i_jal   ;
