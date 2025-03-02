@@ -41,7 +41,6 @@ module dmem(
     end
     
     always_comb begin
-        load_data = 0;
         case (rmem) 
         // unsgigned 1 byte
         5'b00001:begin
