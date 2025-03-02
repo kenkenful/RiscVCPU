@@ -37,59 +37,58 @@ module dmem(
     
     // load
     always_ff@(posedge clk) begin
-        load_data = mem[mem_addr];
+        mem_out = mem[mem_addr];
     end
     
-    //always_comb begin
-    //    load_data = 0;
-    //    case (rmem) 
-    //    // unsgigned 1 byte
-    //    5'b00001:begin
-    //        load_data = {24'h0, mem_out[7:0]};
-    //    end
-    //    5'b00010:begin
-    //        load_data = {24'h0, mem_out[15:8]};
-    //    end
-    //    5'b00100:begin
-    //        load_data = {24'h0, mem_out[23:16]};
-    //    end
-    //    5'b01000:begin
-    //       load_data = {24'h0, mem_out[31:24]};
-    //    end 
-    //    // signed 1 byte
-    //    5'b10001:begin
-    //        load_data = {{24{mem_out[7]}}, mem_out[7:0]};
-    //    end
-    //    5'b10010:begin
-    //        load_data = {{24{mem_out[15]}}, mem_out[15:8]};
-    //    end
-    //    5'b10100:begin
-    //        load_data = {{24{mem_out[23]}}, mem_out[23:16]};
-    //    end
-    //    5'b11000:begin
-    //        load_data = {{24{mem_out[31]}}, mem_out[31:24]};
-    //    end 
-    //    // unsigned 2 bytes
-    //    5'b00011:begin
-    //        load_data = {16'b0, mem_out[15:0]};  
-    //    end
-    //    5'b01100:begin
-    //        load_data = {16'h0, mem_out[31:16]}; 
-    //    end
-    //    // signed 2 bytes
-    //    5'b10011:begin
-    //        load_data = {{16{mem_out[15]}}, mem_out[15:0]};  
-    //    end
-    //    5'b11100:begin
-    //        load_data = {{16{mem_out[31]}}, mem_out[31:16]}; 
-    //    end
-    //    // 4 bytes
-    //    5'b01111:begin
-    //        load_data = mem_out;
-    //    end
-    //    default:;
-    //    endcase
-    //end
+    always_comb begin
+        case (rmem) 
+        // unsgigned 1 byte
+        5'b00001:begin
+            load_data = {24'h0, mem_out[7:0]};
+        end
+        5'b00010:begin
+            load_data = {24'h0, mem_out[15:8]};
+        end
+        5'b00100:begin
+            load_data = {24'h0, mem_out[23:16]};
+        end
+        5'b01000:begin
+           load_data = {24'h0, mem_out[31:24]};
+        end 
+        // signed 1 byte
+        5'b10001:begin
+            load_data = {{24{mem_out[7]}}, mem_out[7:0]};
+        end
+        5'b10010:begin
+            load_data = {{24{mem_out[15]}}, mem_out[15:8]};
+        end
+        5'b10100:begin
+            load_data = {{24{mem_out[23]}}, mem_out[23:16]};
+        end
+        5'b11000:begin
+            load_data = {{24{mem_out[31]}}, mem_out[31:24]};
+        end 
+        // unsigned 2 bytes
+        5'b00011:begin
+            load_data = {16'b0, mem_out[15:0]};  
+        end
+        5'b01100:begin
+            load_data = {16'h0, mem_out[31:16]}; 
+        end
+        // signed 2 bytes
+        5'b10011:begin
+            load_data = {{16{mem_out[15]}}, mem_out[15:0]};  
+        end
+        5'b11100:begin
+            load_data = {{16{mem_out[31]}}, mem_out[31:16]}; 
+        end
+        // 4 bytes
+        5'b01111:begin
+            load_data = mem_out;
+        end
+        default:;
+        endcase
+    end
     
     // store
     always_ff@(posedge clk)begin
