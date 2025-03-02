@@ -1,3 +1,4 @@
+`default_nettype none
 
 module imem(
    clk,
@@ -26,7 +27,7 @@ module imem(
                    $display( "%x: %x",i*4, mem[i]);
         end 
     end
-
+    
     assign inst = mem[pc[31:2]];
     
 endmodule

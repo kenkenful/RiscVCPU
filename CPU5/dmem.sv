@@ -1,4 +1,4 @@
-
+`default_nettype none
 
 module dmem(
     clk,
@@ -22,7 +22,7 @@ module dmem(
     localparam addr_width = 15;
          
     // Block RAM
-    (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  // instruction and data melmory
+    (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  //  data melmory
     
     initial begin 
         integer i = 0;
@@ -37,11 +37,10 @@ module dmem(
     
     // load
     always_ff@(negedge clk) begin
-        mem_out = mem[mem_addr];
+      mem_out = mem[mem_addr];
     end
     
     always_comb begin
-        load_data = 0;
         case (rmem) 
         // unsgigned 1 byte
         5'b00001:begin
