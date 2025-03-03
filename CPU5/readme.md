@@ -13,6 +13,7 @@ add a5 a4 a5
 lw a1 24(sp)
 add a5 a1 a5
 ```
+![CPU5](https://github.com/user-attachments/assets/1707a54a-2c7e-453e-b5f9-ca603742a07c)
 
 
 
