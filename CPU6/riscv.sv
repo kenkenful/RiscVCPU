@@ -142,20 +142,20 @@ module riscv(
         de.i_fencei = (opcode == 7'b0001111) & (rd_de == 5'b00000) & (funct3 == 3'b001) & (rs1_de == 5'b00000) & (imm == 12'b000000000000);
         de.i_ecall  = (opcode == 7'b1110011) & (rd_de == 5'b00000) & (funct3 == 3'b000) & (rs1_de == 5'b00000) & (imm == 12'b000000000000);
         de.i_ebreak = (opcode == 7'b1110011) & (rd_de == 5'b00000) & (funct3 == 3'b000) & (rs1_de == 5'b00000) & (imm == 12'b000000000001);
-        de.i_csrrw  = (opcode == 7'b1110011) && (funct3 == 3'b001);
-        de.i_csrrs  = (opcode == 7'b1110011) && (funct3 == 3'b010);
-        de.i_csrrc  = (opcode == 7'b1110011) && (funct3 == 3'b011);
-        de.i_csrrwi = (opcode == 7'b1110011) && (funct3 == 3'b101);
-        de.i_csrrsi = (opcode == 7'b1110011) && (funct3 == 3'b110);
-        de.i_csrrci = (opcode == 7'b1110011) && (funct3 == 3'b111);
-        de.i_mul    = (opcode == 7'b0110011) && (funct3 == 3'b000) && (funct7 == 7'b0000001);
-        de.i_mulh   = (opcode == 7'b0110011) && (funct3 == 3'b001) && (funct7 == 7'b0000001);
-        de.i_mulhsu = (opcode == 7'b0110011) && (funct3 == 3'b010) && (funct7 == 7'b0000001);
-        de.i_mulhu  = (opcode == 7'b0110011) && (funct3 == 3'b011) && (funct7 == 7'b0000001);
-        de.i_div    = (opcode == 7'b0110011) && (funct3 == 3'b100) && (funct7 == 7'b0000001);
-        de.i_divu   = (opcode == 7'b0110011) && (funct3 == 3'b101) && (funct7 == 7'b0000001);
-        de.i_rem    = (opcode == 7'b0110011) && (funct3 == 3'b110) && (funct7 == 7'b0000001);
-        de.i_remu   = (opcode == 7'b0110011) && (funct3 == 3'b111) && (funct7 == 7'b0000001);
+        de.i_csrrw  = (opcode == 7'b1110011) & (funct3 == 3'b001);
+        de.i_csrrs  = (opcode == 7'b1110011) & (funct3 == 3'b010);
+        de.i_csrrc  = (opcode == 7'b1110011) & (funct3 == 3'b011);
+        de.i_csrrwi = (opcode == 7'b1110011) & (funct3 == 3'b101);
+        de.i_csrrsi = (opcode == 7'b1110011) & (funct3 == 3'b110);
+        de.i_csrrci = (opcode == 7'b1110011) & (funct3 == 3'b111);
+        de.i_mul    = (opcode == 7'b0110011) & (funct3 == 3'b000) & (funct7 == 7'b0000001);
+        de.i_mulh   = (opcode == 7'b0110011) & (funct3 == 3'b001) & (funct7 == 7'b0000001);
+        de.i_mulhsu = (opcode == 7'b0110011) & (funct3 == 3'b010) & (funct7 == 7'b0000001);
+        de.i_mulhu  = (opcode == 7'b0110011) & (funct3 == 3'b011) & (funct7 == 7'b0000001);
+        de.i_div    = (opcode == 7'b0110011) & (funct3 == 3'b100) & (funct7 == 7'b0000001);
+        de.i_divu   = (opcode == 7'b0110011) & (funct3 == 3'b101) & (funct7 == 7'b0000001);
+        de.i_rem    = (opcode == 7'b0110011) & (funct3 == 3'b110) & (funct7 == 7'b0000001);
+        de.i_remu   = (opcode == 7'b0110011) & (funct3 == 3'b111) & (funct7 == 7'b0000001);
     end
 
     // DECODE/EXECUTE pipline reg
