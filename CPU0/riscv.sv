@@ -126,22 +126,22 @@ module riscv(
     wire i_ebreak = (opcode == 7'b1110011) & (rd == 5'b00000) & (funct3 == 3'b000) & (rs1 == 5'b00000) & (imm == 12'b000000000001);
    
     // rv32 zicsr
-    wire i_csrrw  = (opcode == 7'b1110011) && (funct3 == 3'b001);
-    wire i_csrrs  = (opcode == 7'b1110011) && (funct3 == 3'b010);
-    wire i_csrrc  = (opcode == 7'b1110011) && (funct3 == 3'b011);
-    wire i_csrrwi = (opcode == 7'b1110011) && (funct3 == 3'b101);
-    wire i_csrrsi = (opcode == 7'b1110011) && (funct3 == 3'b110);
-    wire i_csrrci = (opcode == 7'b1110011) && (funct3 == 3'b111);
+    wire i_csrrw  = (opcode == 7'b1110011) & (funct3 == 3'b001);
+    wire i_csrrs  = (opcode == 7'b1110011) & (funct3 == 3'b010);
+    wire i_csrrc  = (opcode == 7'b1110011) & (funct3 == 3'b011);
+    wire i_csrrwi = (opcode == 7'b1110011) & (funct3 == 3'b101);
+    wire i_csrrsi = (opcode == 7'b1110011) & (funct3 == 3'b110);
+    wire i_csrrci = (opcode == 7'b1110011) & (funct3 == 3'b111);
 
     // rv32m
-    wire i_mul    = (opcode == 7'b0110011) && (funct3 == 3'b000) && (funct7 == 7'b0000001);
-    wire i_mulh   = (opcode == 7'b0110011) && (funct3 == 3'b001) && (funct7 == 7'b0000001);
-    wire i_mulhsu = (opcode == 7'b0110011) && (funct3 == 3'b010) && (funct7 == 7'b0000001);
-    wire i_mulhu  = (opcode == 7'b0110011) && (funct3 == 3'b011) && (funct7 == 7'b0000001);
-    wire i_div    = (opcode == 7'b0110011) && (funct3 == 3'b100) && (funct7 == 7'b0000001);
-    wire i_divu   = (opcode == 7'b0110011) && (funct3 == 3'b101) && (funct7 == 7'b0000001);
-    wire i_rem    = (opcode == 7'b0110011) && (funct3 == 3'b110) && (funct7 == 7'b0000001);
-    wire i_remu   = (opcode == 7'b0110011) && (funct3 == 3'b111) && (funct7 == 7'b0000001);
+    wire i_mul    = (opcode == 7'b0110011) & (funct3 == 3'b000) & (funct7 == 7'b0000001);
+    wire i_mulh   = (opcode == 7'b0110011) & (funct3 == 3'b001) & (funct7 == 7'b0000001);
+    wire i_mulhsu = (opcode == 7'b0110011) & (funct3 == 3'b010) & (funct7 == 7'b0000001);
+    wire i_mulhu  = (opcode == 7'b0110011) & (funct3 == 3'b011) & (funct7 == 7'b0000001);
+    wire i_div    = (opcode == 7'b0110011) & (funct3 == 3'b100) & (funct7 == 7'b0000001);
+    wire i_divu   = (opcode == 7'b0110011) & (funct3 == 3'b101) & (funct7 == 7'b0000001);
+    wire i_rem    = (opcode == 7'b0110011) & (funct3 == 3'b110) & (funct7 == 7'b0000001);
+    wire i_remu   = (opcode == 7'b0110011) & (funct3 == 3'b111) & (funct7 == 7'b0000001);
 
     reg    [31:0] regfile [1:31];                  //  regfile[0] is zero register.
   
