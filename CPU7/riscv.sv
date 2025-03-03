@@ -357,7 +357,7 @@ module riscv(
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               rmem = 5'b01111;                             
               is_write_back_ex = 1;
-              is_load_ex = 1'b1;                       
+              is_load_ex = 1;                       
             end               
 
             ex.i_lbu: begin                                   // load 1byte unsigned
@@ -365,7 +365,7 @@ module riscv(
               mem_addr  = {2'b0, alu_out_ex[31:2]};              
               rmem = 5'b00001 << alu_out_ex[1:0];
               is_write_back_ex = 1;
-              is_load_ex = 1'b1;                     
+              is_load_ex = 1;                     
             end
 
             ex.i_lb: begin                                     // load 1byte
@@ -373,7 +373,7 @@ module riscv(
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               rmem = (5'b00001 << alu_out_ex[1:0]) | 5'b10000;
               is_write_back_ex = 1; 
-              is_load_ex = 1'b1;                   
+              is_load_ex = 1;                   
             end
 
             ex.i_lhu: begin                                    // load 2bytes unsigned
@@ -381,7 +381,7 @@ module riscv(
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               rmem = 5'b00011 << {alu_out_ex[1],1'b0}; 
               is_write_back_ex = 1; 
-              is_load_ex = 1'b1;                   
+              is_load_ex = 1;                   
             end
 
             ex.i_lh: begin                                     // load 2bytes 
@@ -389,14 +389,14 @@ module riscv(
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               rmem = (5'b00011 << {alu_out_ex[1],1'b0}) | 5'b10000; 
               is_write_back_ex = 1; 
-              is_load_ex = 1'b1;                 
+              is_load_ex = 1;                 
             end
 
             ex.i_sb: begin                                    // 1 byte store
               alu_out_ex = a + stimm_ex;
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               wmem    = 4'b0001 << alu_out_ex[1:0];         // Which Byte position is it stored to?
-              is_store = 1'b1;
+              is_store = 1;
               
               if(alu_out_ex == `UART_TX_ADDR) begin
                    uart_en = 1'b1;
@@ -408,14 +408,14 @@ module riscv(
               alu_out_ex = a + stimm_ex;
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               wmem = 4'b0011 << {alu_out_ex[1], 1'b0};        // Which Byte position is it sorted to?
-              is_store = 1'b1;
+              is_store = 1;
             end
 
             ex.i_sw: begin                                    // 4 bytes store
               alu_out_ex = a + stimm_ex;
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               wmem = 4'b1111;                              // Which Byte position is it sorted to?
-              is_store = 1'b1;
+              is_store = 1;
             end
 
             ex.i_beq: begin                                   // beq
