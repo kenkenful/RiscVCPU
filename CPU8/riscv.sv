@@ -401,7 +401,7 @@ module riscv(
               is_store = 1;
               
               if(alu_out_ex == `UART_TX_ADDR) begin
-                   uart_en = 1'b1;
+                   uart_en = 1;
                    uart_tx_data = store_data_ex[7:0];
               end
             end
