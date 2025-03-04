@@ -2,7 +2,7 @@
 すべて組み合わせ回路で構成されたRISC-V CPUになります。</br>
 ①のクロックの立ち上がりで、pcがラッチされたら、フェッチ、デコード、実行、メモリアクセス、ライトバックまでをクロック１サイクルの間にやりきる必要があるので、周波数を高くすることができません。</br>
 
-![CPU](https://github.com/user-attachments/assets/1d2f70e2-3240-4293-a3cc-844e4b877f4e)
+![CPU](https://github.com/user-attachments/assets/26562ab2-a39b-4da3-9c37-1fe3de34dbc0)
 
 
 この組み合わせ回路をベースにパイプラインや割り込みなどの対応を追加していきます。
