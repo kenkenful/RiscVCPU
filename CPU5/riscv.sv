@@ -80,8 +80,8 @@ module riscv(
         jaloffset_de = {{11{sign}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0}; 
 
         // forwarding 
-        a_de = (rs1_de == 0) ? 0 : (is_load_ex & rd_ex == rs1_de) ? load_data : (is_write_back_ex & rd_ex == rs1_de) ? alu_out_ex : regfile[rs1_de]; 
-        b_de = (rs2_de == 0) ? 0 : (is_load_ex & rd_ex == rs2_de) ? load_data : (is_write_back_ex & rd_ex == rs2_de) ? alu_out_ex : regfile[rs2_de];  
+        a_de = (rs1_de == 0) ? 0 : (is_load_ex & (rd_ex == rs1_de)) ? load_data : (is_write_back_ex & (rd_ex == rs1_de)) ? alu_out_ex : regfile[rs1_de]; 
+        b_de = (rs2_de == 0) ? 0 : (is_load_ex & (rd_ex == rs2_de)) ? load_data : (is_write_back_ex & (rd_ex == rs2_de)) ? alu_out_ex : regfile[rs2_de];  
 
         de.i_auipc  = (opcode == 7'b0010111);
         de.i_lui    = (opcode == 7'b0110111);
