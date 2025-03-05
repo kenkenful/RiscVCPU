@@ -17,4 +17,9 @@ li	a0,10</br>
 
   100:	fe010113          	addi	sp,sp,-32
 ```
-![CPU](https://github.com/user-attachments/assets/f2c9a8c0-a089-4ecc-a2d4-b09c99726ee2)
+ちなみに、next_pcが指す命令は、緑線が組み合わせ回路のため、</br>
+addi	s0,sp,32</br>
+から</br>
+addi	sp,sp,-32</br>
+にすぐに変更されます。
+![CPU](https://github.com/user-attachments/assets/f5377ced-188c-479a-8bbc-0605a5ce8fc9)
