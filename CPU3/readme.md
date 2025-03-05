@@ -5,4 +5,16 @@
 ![CPU](https://github.com/user-attachments/assets/40c4a925-1aae-49f4-98fa-b7f351102c8d)
 
 
-命令メモリをBRAM化しようとすると、JUMPしたときにpcレジスタにラッチされた命令を捨てる処理を追加しないと行けないため、依然、分散RAMが使用されています。
+命令メモリをBRAM化しようとすると、JUMPしたときにpcレジスタにラッチされた直後の命令を捨てる必要があります。</br>
+以下の例だと、</br>
+li	a0,10</br>
+を捨てる必要があります。その対応はCPU4で実施します。</br>
+```
+  a0:	02010413          	addi	s0,sp,32
+  a4:	00a00513          	li	a0,10
+  a8:	058000ef          	jal	100 <fib>
+    ...
+
+  100:	fe010113          	addi	sp,sp,-32
+```
+![CPU](https://github.com/user-attachments/assets/f2c9a8c0-a089-4ecc-a2d4-b09c99726ee2)
