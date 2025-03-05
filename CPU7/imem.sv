@@ -17,9 +17,7 @@ module imem(
     // Distributed RAM
     localparam data_width = 32;
     localparam addr_width = 12;
-     
-    // reg [data_width-1:0] mem [2**addr_width-1:0];  // instruction and data melmory
-    
+         
     // Block RAM
     (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  // instruction melmory
     
