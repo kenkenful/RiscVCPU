@@ -22,7 +22,7 @@ module dmem(
     localparam addr_width = 15;
          
     // Block RAM
-    (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  // instruction and data melmory
+    (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  // data melmory
     
     initial begin 
         integer i = 0;
