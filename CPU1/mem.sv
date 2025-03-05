@@ -86,7 +86,9 @@ module mem(
             5'b01111:begin
                 load_data = mem[mem_addr];
             end
-            default:;
+            default:begin
+                load_data = 0;    
+            end
         endcase
     end
     
