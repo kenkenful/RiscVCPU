@@ -501,7 +501,7 @@ module riscv(
     
     // store
     always_ff@(posedge clk)begin
-        if(is_store == 1) mem[mem_addr] <= store_data;
+        if(is_store) mem[mem_addr] <= store_data;
     end
     
     wire [31:0] write_back_data = is_load ? load_data : alu_out;
