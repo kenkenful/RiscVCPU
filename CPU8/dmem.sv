@@ -34,12 +34,12 @@ module dmem(
     
       // load
     always_ff@(posedge clk) begin
-      if(rmem != 0) load_data = mem[mem_addr];
+      if(rmem) load_data = mem[mem_addr];
     end
     
     // store
     always_ff@(posedge clk)begin
-      if(wmem != 0) mem[mem_addr] <= store_data;
+      if(wmem) mem[mem_addr] <= store_data;
     end
     
     
