@@ -8,7 +8,7 @@ module riscv(
       uart_en,
       uart_tx_data
     );
-
+    
     input wire clk;             // clock 
     input wire reset;           // reset
     output reg uart_en;
@@ -314,6 +314,14 @@ module riscv(
               wmem    = 4'b0001 << alu_out[1:0];         // Which Byte position is it stored to?
               is_store = 1;
               
+              case(wmem)
+                4'b0001: store_data = {24'b0, b[7:0]};
+                4'b0010: store_data = {16'b0, b[7:0], 8'b0};
+                4'b0100: store_data = {8'b0, b[7:0], 16'b0};
+                4'b1000: store_data = {b[7:0], 24'b0};
+                default: store_data = 0;
+              endcase
+              
               if(alu_out == `UART_TX_ADDR) begin
                    uart_en = 1;
                    uart_tx_data = store_data[7:0];
@@ -325,6 +333,13 @@ module riscv(
               mem_addr  = {2'b0, alu_out[31:2]};
               wmem = 4'b0011 << {alu_out[1], 1'b0};        // Which Byte position is it sorted to?
               is_store = 1;
+             
+              case(wmem)
+                4'b0011: store_data = {16'b0, b[15:0]};
+                4'b1100: store_data = {b[15:0],16'b0};   
+                default: store_data = 0;
+              endcase
+              
             end
 
             i_sw: begin                                    // 4 bytes store
@@ -332,6 +347,7 @@ module riscv(
               mem_addr  = {2'b0, alu_out[31:2]};
               wmem = 4'b1111;                              // Which Byte position is it sorted to?
               is_store = 1;
+            
             end
 
             i_beq: begin                                   // beq
@@ -462,81 +478,30 @@ module riscv(
     always_comb begin
         case (rmem) 
             // unsgigned 1 byte
-            5'b00001:begin
-                load_data = {24'h0, mem[mem_addr][7:0]};
-            end
-            5'b00010:begin
-                load_data = {24'h0, mem[mem_addr][15:8]};
-            end
-            5'b00100:begin
-                load_data = {24'h0, mem[mem_addr][23:16]};
-            end
-            5'b01000:begin
-                load_data = {24'h0, mem[mem_addr][31:24]};
-            end 
+            5'b00001: load_data = {24'h0, mem[mem_addr][7:0]};
+            5'b00010: load_data = {24'h0, mem[mem_addr][15:8]};
+            5'b00100: load_data = {24'h0, mem[mem_addr][23:16]};
+            5'b01000: load_data = {24'h0, mem[mem_addr][31:24]};
             // signed 1 byte
-            5'b10001:begin
-                load_data = {{24{mem[mem_addr][7]}}, mem[mem_addr][7:0]};
-            end
-            5'b10010:begin
-                load_data = {{24{mem[mem_addr][15]}}, mem[mem_addr][15:8]};
-            end
-            5'b10100:begin
-                load_data = {{24{mem[mem_addr][23]}}, mem[mem_addr][23:16]};
-            end
-            5'b11000:begin
-                load_data = {{24{mem[mem_addr][31]}}, mem[mem_addr][31:24]};
-            end 
+            5'b10001: load_data = {{24{mem[mem_addr][7]}}, mem[mem_addr][7:0]};
+            5'b10010: load_data = {{24{mem[mem_addr][15]}}, mem[mem_addr][15:8]};
+            5'b10100: load_data = {{24{mem[mem_addr][23]}}, mem[mem_addr][23:16]};
+            5'b11000: load_data = {{24{mem[mem_addr][31]}}, mem[mem_addr][31:24]};
             // unsigned 2 bytes
-            5'b00011:begin
-                load_data = {16'b0, mem[mem_addr][15:0]};  
-            end
-            5'b01100:begin
-                load_data = {16'h0, mem[mem_addr][31:16]}; 
-            end
+            5'b00011: load_data = {16'b0, mem[mem_addr][15:0]};  
+            5'b01100: load_data = {16'h0, mem[mem_addr][31:16]}; 
             // signed 2 bytes
-            5'b10011:begin
-                load_data = {{16{mem[mem_addr][15]}}, mem[mem_addr][15:0]};  
-            end
-            5'b11100:begin
-                load_data = {{16{mem[mem_addr][31]}}, mem[mem_addr][31:16]}; 
-            end
+            5'b10011: load_data = {{16{mem[mem_addr][15]}}, mem[mem_addr][15:0]};  
+            5'b11100: load_data = {{16{mem[mem_addr][31]}}, mem[mem_addr][31:16]}; 
             // 4 bytes
-            5'b01111:begin
-                load_data = mem[mem_addr];
-            end
-            default:begin
-                load_data = 0;    
-            end
+            5'b01111: load_data = mem[mem_addr];
+            default: load_data = 0;    
         endcase
     end
     
     // store
     always_ff@(posedge clk)begin
-        case(wmem)
-          4'b0001:begin
-            mem[mem_addr] <= {24'b0, store_data[7:0]};
-          end
-          4'b0010:begin
-            mem[mem_addr] <= {16'b0, store_data[7:0], 8'b0};
-          end
-          4'b0100:begin
-            mem[mem_addr] <= {8'b0, store_data[7:0], 16'b0};
-          end
-          4'b1000:begin
-            mem[mem_addr] <= {store_data[7:0], 24'b0};
-          end
-          4'b0011:begin
-            mem[mem_addr] <= {16'b0, store_data[15:0]};
-          end
-          4'b1100:begin
-            mem[mem_addr] <= {store_data[15:0],16'b0};    
-          end
-          4'b1111:begin
-            mem[mem_addr] <= store_data[31:0];
-          end
-          default:;
-        endcase
+        if(is_store == 1) mem[mem_addr] <= store_data;
     end
     
     wire [31:0] write_back_data = is_load ? load_data : alu_out;
