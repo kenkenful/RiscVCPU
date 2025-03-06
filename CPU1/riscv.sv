@@ -291,6 +291,14 @@ module riscv(
               mem_addr  = {2'b0, alu_out[31:2]};
               wmem    = 4'b0001 << alu_out[1:0];         // Which Byte position is it stored to?
               is_store = 1;
+
+              case(wmem)
+                4'b0001: store_data = {24'b0, b[7:0]};
+                4'b0010: store_data = {16'b0, b[7:0], 8'b0};
+                4'b0100: store_data = {8'b0, b[7:0], 16'b0};
+                4'b1000: store_data = {b[7:0], 24'b0};
+                default: store_data = 0;
+              endcase
               
               if(alu_out == `UART_TX_ADDR) begin
                    uart_en = 1;
@@ -303,6 +311,13 @@ module riscv(
               mem_addr  = {2'b0, alu_out[31:2]};
               wmem = 4'b0011 << {alu_out[1], 1'b0};        // Which Byte position is it sorted to?
               is_store = 1;
+
+              case(wmem)
+                4'b0011: store_data = {16'b0, b[15:0]};
+                4'b1100: store_data = {b[15:0],16'b0};   
+                default: store_data = 0;
+              endcase
+              
             end
 
             i_sw: begin                                    // 4 bytes store
