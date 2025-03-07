@@ -20,7 +20,8 @@ module riscv(
     reg [4:0] rmem;
     reg [31:0] mem_addr;
     reg [31:0] store_data;
-    wire [31:0] load_data;
+    reg [31:0] load_data;
+    wire [31:0] mem_out;
 
     reg [31:0] pc;            
     reg [31:0] jump_addr;
@@ -40,11 +41,11 @@ module riscv(
         .clk(clk),
         .pc(pc),
         .inst(inst),
-        .wmem(wmem),
-        .rmem(rmem),
+        .is_store(is_store),
+        .is_load(is_load),
         .mem_addr(mem_addr),
         .store_data(store_data),
-        .load_data(load_data)
+        .load_data(mem_out)
     );
     
     // decode
@@ -447,6 +448,30 @@ module riscv(
             end
             default:;
  
+        endcase
+    end
+
+    always_comb begin
+        case (rmem) 
+            // unsgigned 1 byte
+            5'b00001: load_data = {24'h0, mem_out[7:0]};
+            5'b00010: load_data = {24'h0, mem_out[15:8]};
+            5'b00100: load_data = {24'h0, mem_out[23:16]};
+            5'b01000: load_data = {24'h0, mem_out[31:24]};
+            // signed 1 byte
+            5'b10001: load_data = {{24{mem_out[7]}},  mem_out[7:0]};
+            5'b10010: load_data = {{24{mem_out[15]}}, mem_out[15:8]};
+            5'b10100: load_data = {{24{mem_out[23]}}, mem_out[23:16]};
+            5'b11000: load_data = {{24{mem_out[31]}}, mem_out[31:24]};
+            // unsigned 2 bytes
+            5'b00011: load_data = {16'b0, mem_out[15:0]};  
+            5'b01100: load_data = {16'h0, mem_out[31:16]}; 
+            // signed 2 bytes
+            5'b10011: load_data = {{16{mem_out[15]}}, mem_out[15:0]};  
+            5'b11100: load_data = {{16{mem_out[31]}}, mem_out[31:16]}; 
+            // 4 bytes
+            5'b01111: load_data = mem_out;
+            default: load_data = 0;    
         endcase
     end
 
