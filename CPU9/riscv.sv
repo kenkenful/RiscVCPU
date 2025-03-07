@@ -37,8 +37,8 @@ module riscv(
         .is_stoll(is_stoll),
         .pc(pc),
         .inst(inst),                // FETCH/DECODE pipline     
-        .wmem(wmem_mem),
-        .rmem(rmem_mem),
+        .is_store(is_store_mem),
+        .is_load(is_load_mem),
         .mem_addr(mem_addr_mem),
         .store_data(store_data_mem),
         .load_data(load_data_mem) 
@@ -238,10 +238,10 @@ module riscv(
     // output
     reg [63:0] mul;     
     reg is_load_ex;
-    reg is_store;
+    reg is_store_ex;
     reg is_write_back_ex;             
     reg [31:0] alu_out_ex;         
-    reg [3:0] wmem_ex;
+    reg [3:0] wmem;
     reg [4:0] rmem_ex;
     reg [31:0] mem_addr_ex;
     reg [31:0] store_data_ex;
@@ -250,14 +250,14 @@ module riscv(
         alu_out_ex = 0;                                             
         mem_addr_ex  = 0;                                     
         is_write_back_ex = 0;                                    
-        wmem_ex = 0;                                          
+        wmem = 0;                                          
         rmem_ex = 0;
         uart_en = 0;
         uart_tx_data = 0;
         jump_addr = 0;
         mul = 0;
         is_load_ex = 0;
-        is_store = 0;
+        is_store_ex = 0;
         is_jump = 0;
         store_data_ex = 0;
 
@@ -401,10 +401,10 @@ module riscv(
             ex.i_sb: begin                                    // 1 byte store
               alu_out_ex = a + stimm_ex;
               mem_addr_ex  = {2'b0, alu_out_ex[31:2]};
-              wmem_ex    = 4'b0001 << alu_out_ex[1:0];         // Which Byte position is it stored to?
-              is_store = 1;
+              wmem    = 4'b0001 << alu_out_ex[1:0];         // Which Byte position is it stored to?
+              is_store_ex = 1;
 
-              case(wmem_ex)
+              case(wmem)
                 4'b0001: store_data_ex = {24'b0, b[7:0]};
                 4'b0010: store_data_ex = {16'b0, b[7:0], 8'b0};
                 4'b0100: store_data_ex = {8'b0, b[7:0], 16'b0};
@@ -421,10 +421,10 @@ module riscv(
             ex.i_sh: begin                                    // 2 bytes store
               alu_out_ex = a + stimm_ex;
               mem_addr_ex  = {2'b0, alu_out_ex[31:2]};
-              wmem_ex = 4'b0011 << {alu_out_ex[1], 1'b0};        // Which Byte position is it sorted to?
-              is_store = 1;
+              wmem = 4'b0011 << {alu_out_ex[1], 1'b0};        // Which Byte position is it sorted to?
+              is_store_ex = 1;
 
-              case(wmem_ex)
+              case(wmem)
                 4'b0011: store_data_ex = {16'b0, b[15:0]};
                 4'b1100: store_data_ex = {b[15:0],16'b0};   
                 default: store_data_ex = 0;
@@ -435,8 +435,8 @@ module riscv(
             ex.i_sw: begin                                    // 4 bytes store
               alu_out_ex = a + stimm_ex;
               mem_addr_ex  = {2'b0, alu_out_ex[31:2]};
-              wmem_ex = 4'b1111;                              // Which Byte position is it sorted to?
-              is_store = 1;
+              wmem = 4'b1111;                              // Which Byte position is it sorted to?
+              is_store_ex = 1;
               store_data_ex = b; 
             end
 
@@ -564,12 +564,11 @@ module riscv(
     end
     
     // MEM STAGE
+    reg is_store_mem;
     reg is_load_mem;
     reg [4:0] rd_mem;
     reg is_write_back_mem;             
     reg [31:0] alu_out_mem;     
-
-    reg [3:0] wmem_mem;
     reg [4:0] rmem_mem;
     reg [31:0] mem_addr_mem;
     reg [31:0] store_data_mem;
@@ -577,26 +576,14 @@ module riscv(
 
     // execute/mem pipline
     always@(posedge clk)begin
-      //if(is_stoll)begin
-      //  is_load_mem       <= 0;
-      //  rd_mem            <= 0;
-      //  is_write_back_mem <= 0;
-      //  alu_out_mem       <= 0;
-      //  wmem_mem          <= 0;
-      //  rmem_mem          <= 0;
-      //  mem_addr_mem      <= 0;
-      //  store_data_mem    <= 0;
-      //
-      //end else begin
+      is_store_mem      <= is_store_ex;
       is_load_mem       <= is_load_ex;
       rd_mem            <= rd_ex;
       is_write_back_mem <= is_write_back_ex;
       alu_out_mem       <= alu_out_ex;
-      wmem_mem          <= wmem_ex;
       rmem_mem          <= rmem_ex;
       mem_addr_mem      <= mem_addr_ex;
       store_data_mem    <= store_data_ex;
-      //end
     end
 
     reg is_write_back_wb;
