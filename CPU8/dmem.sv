@@ -2,8 +2,8 @@
 
 module dmem(
     clk,
-    wmem,
-    rmem,
+    is_store,
+    is_load,
     mem_addr,
     store_data,
     load_data,
@@ -11,17 +11,18 @@ module dmem(
     );
     
     input wire clk;
-    input wire [3:0] wmem;
-    input wire [4:0] rmem;
+    input wire is_store;
+    input wire is_load;
     input wire [31:0] mem_addr;
     input wire [31:0] store_data;
     output reg [31:0] load_data;
     
+       // Distributed RAM
     localparam data_width = 32;
     localparam addr_width = 15;
          
     // Block RAM
-    (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  //  data melmory
+    (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  // data melmory
     
     initial begin 
         integer i = 0;
@@ -32,15 +33,14 @@ module dmem(
         end 
     end
     
-      // load
+    // load
     always_ff@(posedge clk) begin
-      if(rmem) load_data = mem[mem_addr];
+        if(is_load) load_data = mem[mem_addr];
     end
     
     // store
     always_ff@(posedge clk)begin
-      if(wmem) mem[mem_addr] <= store_data;
+        if(is_store) mem[mem_addr] <= store_data;
     end
-    
     
 endmodule
