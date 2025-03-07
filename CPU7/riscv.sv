@@ -230,11 +230,11 @@ module riscv(
     // output
     reg [63:0] mul;     
     reg is_load_ex;
-    reg is_store;
+    reg is_store_ex;
     reg is_write_back_ex;             
     reg [31:0] alu_out_ex;         
     reg [3:0] wmem;
-    reg [4:0] rmem;
+    reg [4:0] rmem_ex;
     reg [31:0] mem_addr;
     reg [31:0] store_data;
     
@@ -243,13 +243,13 @@ module riscv(
         mem_addr  = 0;                                     
         is_write_back_ex = 0;                                    
         wmem = 0;                                          
-        rmem = 0;
+        rmem_ex = 0;
         uart_en = 0;
         uart_tx_data = 0;
         jump_addr = 0;
         mul = 0;
         is_load_ex = 0;
-        is_store = 0;
+        is_store_ex = 0;
         is_jump = 0;
         is_stoll = 0;
 
@@ -355,7 +355,7 @@ module riscv(
             ex.i_lw: begin                                    // load 4bytes
               alu_out_ex = a + simm_ex;                        
               mem_addr  = {2'b0, alu_out_ex[31:2]};
-              rmem = 5'b01111;                             
+              rmem_ex = 5'b01111;                             
               is_write_back_ex = 1;
               is_load_ex = 1;                       
             end               
@@ -363,7 +363,7 @@ module riscv(
             ex.i_lbu: begin                                   // load 1byte unsigned
               alu_out_ex = a + simm_ex;                        
               mem_addr  = {2'b0, alu_out_ex[31:2]};              
-              rmem = 5'b00001 << alu_out_ex[1:0];
+              rmem_ex = 5'b00001 << alu_out_ex[1:0];
               is_write_back_ex = 1;
               is_load_ex = 1;                     
             end
@@ -371,7 +371,7 @@ module riscv(
             ex.i_lb: begin                                     // load 1byte
               alu_out_ex = a + simm_ex;                         
               mem_addr  = {2'b0, alu_out_ex[31:2]};
-              rmem = (5'b00001 << alu_out_ex[1:0]) | 5'b10000;
+              rmem_ex = (5'b00001 << alu_out_ex[1:0]) | 5'b10000;
               is_write_back_ex = 1; 
               is_load_ex = 1;                   
             end
@@ -379,7 +379,7 @@ module riscv(
             ex.i_lhu: begin                                    // load 2bytes unsigned
               alu_out_ex = a + simm_ex;                         
               mem_addr  = {2'b0, alu_out_ex[31:2]};
-              rmem = 5'b00011 << {alu_out_ex[1],1'b0}; 
+              rmem_ex = 5'b00011 << {alu_out_ex[1],1'b0}; 
               is_write_back_ex = 1; 
               is_load_ex = 1;                   
             end
@@ -387,7 +387,7 @@ module riscv(
             ex.i_lh: begin                                     // load 2bytes 
               alu_out_ex = a + simm_ex;                         
               mem_addr  = {2'b0, alu_out_ex[31:2]};
-              rmem = (5'b00011 << {alu_out_ex[1],1'b0}) | 5'b10000; 
+              rmem_ex = (5'b00011 << {alu_out_ex[1],1'b0}) | 5'b10000; 
               is_write_back_ex = 1; 
               is_load_ex = 1;                 
             end
@@ -396,7 +396,15 @@ module riscv(
               alu_out_ex = a + stimm_ex;
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               wmem    = 4'b0001 << alu_out_ex[1:0];         // Which Byte position is it stored to?
-              is_store = 1;
+              is_store_ex = 1;
+
+              case(wmem)
+                4'b0001: store_data = {24'b0, b[7:0]};
+                4'b0010: store_data = {16'b0, b[7:0], 8'b0};
+                4'b0100: store_data = {8'b0, b[7:0], 16'b0};
+                4'b1000: store_data = {b[7:0], 24'b0};
+                default: store_data = 0;
+              endcase
               
               if(alu_out_ex == `UART_TX_ADDR) begin
                    uart_en = 1;
@@ -408,14 +416,20 @@ module riscv(
               alu_out_ex = a + stimm_ex;
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               wmem = 4'b0011 << {alu_out_ex[1], 1'b0};        // Which Byte position is it sorted to?
-              is_store = 1;
+              is_store_ex = 1;
+              case(wmem)
+                4'b0011: store_data = {16'b0, b[15:0]};
+                4'b1100: store_data = {b[15:0],16'b0};   
+                default: store_data = 0;
+              endcase
             end
 
             ex.i_sw: begin                                    // 4 bytes store
               alu_out_ex = a + stimm_ex;
               mem_addr  = {2'b0, alu_out_ex[31:2]};
               wmem = 4'b1111;                              // Which Byte position is it sorted to?
-              is_store = 1;
+              is_store_ex = 1;
+
             end
 
             ex.i_beq: begin                                   // beq
@@ -542,15 +556,16 @@ module riscv(
     end
     
     // MEM STAGE
-    wire [31:0] load_data_wb;
+    wire [31:0] load_data_mem;
+    reg [31:0] load_data_wb;
 
     dmem dmem0(
         .clk(clk),
-        .wmem(wmem),
-        .rmem(rmem),
+        .is_store(is_store_ex),
+        .is_load(is_load_ex),
         .mem_addr(mem_addr),
         .store_data(store_data),
-        .load_data(load_data_wb)
+        .load_data(load_data_mem)
     );
 
     // EXE,MEM/WB pipline reg
@@ -558,12 +573,38 @@ module riscv(
     reg [4:0] rd_wb;
     reg [31:0] alu_out_wb;
     reg is_load_wb;
+    reg [4:0] rmem_wb;
 
     always_ff@(posedge clk)begin
       is_write_back_wb <= is_write_back_ex;
-      is_load_wb <= is_load_ex; 
-      alu_out_wb <= alu_out_ex;
-      rd_wb <= rd_ex;
+      is_load_wb       <= is_load_ex; 
+      alu_out_wb       <= alu_out_ex;
+      rd_wb            <= rd_ex;
+      rmem_wb          <= rmem_ex;
+    end
+
+    always_comb begin
+      case (rmem_wb) 
+        // unsgigned 1 byte
+        5'b00001: load_data_wb = {24'h0, load_data_mem[7:0]};
+        5'b00010: load_data_wb = {24'h0, load_data_mem[15:8]};
+        5'b00100: load_data_wb = {24'h0, load_data_mem[23:16]};
+        5'b01000: load_data_wb = {24'h0, load_data_mem[31:24]};
+        // signed 1 byte
+        5'b10001: load_data_wb = {{24{load_data_mem[7]}}, load_data_mem[7:0]};
+        5'b10010: load_data_wb = {{24{load_data_mem[15]}}, load_data_mem[15:8]};
+        5'b10100: load_data_wb = {{24{load_data_mem[23]}}, load_data_mem[23:16]};
+        5'b11000: load_data_wb = {{24{load_data_mem[31]}}, load_data_mem[31:24]};
+        // unsigned 2 bytes
+        5'b00011: load_data_wb = {16'b0, load_data_mem[15:0]};  
+        5'b01100: load_data_wb = {16'h0, load_data_mem[31:16]}; 
+        // signed 2 bytes
+        5'b10011: load_data_wb = {{16{load_data_mem[15]}}, load_data_mem[15:0]};  
+        5'b11100: load_data_wb = {{16{load_data_mem[31]}}, load_data_mem[31:16]}; 
+        // 4 bytes
+        5'b01111: load_data_wb = load_data_mem;
+        default:  load_data_wb = 0;    
+      endcase
     end
 
     // WRITE BACK STAGE
