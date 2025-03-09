@@ -559,22 +559,22 @@ module riscv(
           end
 
           i_amomax:begin
-            mem[a] <= ($signed(mem[a]) > $signed(b)) ? mem[a] : mem[b];
+            mem[a] <= ($signed(mem[a]) > $signed(b)) ? mem[a] : b;
             //if(rd != 0) regfile[rd] <= mem[a]; 
           end 
 
           i_amomaxu:begin
-            mem[a] <= (a > b) ? mem[a] : mem[b];
+            mem[a] <= (a > b) ? mem[a] : b;
             //if(rd != 0) regfile[rd] <= mem[a]; 
           end
 
           i_amomin:begin
-            mem[a] <= ($signed(mem[a]) > $signed(b)) ? mem[b] : mem[a];
+            mem[a] <= ($signed(mem[a]) > $signed(b)) ? b : mem[a];
             //if(rd != 0) regfile[rd] <= mem[a]; 
           end
 
           i_amominu:begin
-            mem[a] <= (a > b) ? mem[b] : mem[a];
+            mem[a] <= (mem[a] > b) ? b : mem[a];
             //if(rd != 0) regfile[rd] <= mem[a];  
           end
 
