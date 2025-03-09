@@ -564,7 +564,7 @@ module riscv(
           end 
 
           i_amomaxu:begin
-            mem[a] <= (a > b) ? mem[a] : b;
+            mem[a] <= (mem[a] > b) ? mem[a] : b;
             //if(rd != 0) regfile[rd] <= mem[a]; 
           end
 
