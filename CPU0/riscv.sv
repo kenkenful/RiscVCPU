@@ -20,9 +20,6 @@ module riscv(
      
     reg [data_width-1:0] mem [2**addr_width-1:0];  // instruction and data melmory
     
-    // Block RAM
-    //(* ram_style = "block" *)reg [31:0] mem [0:16383];  // instruction and data melmory
-    
     //initial begin
     //    integer num = 0;
     //    integer i = 0;
