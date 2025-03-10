@@ -3,7 +3,7 @@
 #define MTVEC_VECTORED_MODE 0x1U
 
 extern void Schedule(void);
-extern int switch_context(unsigned long *next_sp, unsigned long* sp);
+extern int  switch_context(unsigned long *next_sp, unsigned long* sp);
 extern void load_context(unsigned long *sp);
 
 extern void EnableTimer(void);
@@ -18,17 +18,14 @@ int Timer(void);
 int fib(int n);
 int add(int a, int b);
 
-volatile unsigned long * const reg_mtime = ((unsigned long *)0x20000020);
-volatile unsigned long * const reg_mtimecmp = ((unsigned long *)0x20000040);
-
-#define INTERVAL 1000
-
+volatile unsigned long * const mtime    = ((unsigned long *)0x20000020);
+volatile unsigned long * const mtimecmp = ((unsigned long *)0x20000040);
 
 int main() {
-    *reg_mtime = 100;
+    *mtime = 100;
     SetTrapVectors((unsigned long)trap_vectors + MTVEC_VECTORED_MODE);
 
-    *reg_mtimecmp = *reg_mtime + 3000;
+    *mtimecmp = *mtime + 10000;
     EnableTimer();
     EnableInt();
 
@@ -48,10 +45,8 @@ int main() {
     return 0;
 }   
 
-
 int add(int a, int b){
     return a + b;
-
 }
 
 int fib(int n) {
@@ -61,5 +56,6 @@ int fib(int n) {
 
 int Timer(void)
 {
+    *mtimecmp = *mtimecmp + 10000;
     return fib(10);;
 }
