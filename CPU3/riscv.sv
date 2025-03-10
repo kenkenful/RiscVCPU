@@ -468,7 +468,7 @@ module riscv(
         5'b10100: load_data = {{24{mem_out[23]}}, mem_out[23:16]};
         5'b11000: load_data = {{24{mem_out[31]}}, mem_out[31:24]};
         // unsigned 2 bytes
-        5'b00011: load_data = {16'b0, mem_out[15:0]};  
+        5'b00011: load_data = {16'h0, mem_out[15:0]};  
         5'b01100: load_data = {16'h0, mem_out[31:16]}; 
         // signed 2 bytes
         5'b10011: load_data = {{16{mem_out[15]}}, mem_out[15:0]};  
