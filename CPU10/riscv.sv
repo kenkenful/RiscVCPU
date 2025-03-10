@@ -154,6 +154,8 @@ module riscv(
     wire i_amomor  = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b01000);
     wire i_amoswap = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b00001);
     wire i_amoxor  = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b00100);
+    wire i_sc      = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b00011);
+    wire i_lr      = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b00010);
 
     reg    [31:0] regfile [1:31];                  //  regfile[0] is zero register.
   
@@ -527,8 +529,10 @@ module riscv(
     
     wire rise_timer_interrupt = (mtimecmp == mtime && !csr_reg.mip.mtip && csr_reg.mie.mtie && csr_reg.mstatus.mie) ? 1: 0;
                                                     //   not pending     enable timer interrupt   emable interrupt
-    reg [31:0] mtime = 0;
-    reg [31:0] mtimecmp = 0;
+    reg [63:0] mtime = 0;
+    reg [63:0] mtimecmp = 0;
+
+    reg [31:0] reservation_reg = 0;   // for sc/lr operation
 
     // store
     always_ff@(posedge clk)begin
@@ -541,9 +545,8 @@ module riscv(
         else if(is_store && alu_out == MTIMECMP_ADDR) mtimecmp <= store_data;  
         else if(is_store)  mem[mem_addr] <= store_data;
 
-        if(!(is_store && alu_out == MTIME_ADDR) && !csr_reg.mip.mtip && csr_reg.mie.mtie && csr_reg.mstatus.mie) begin
-          if(mtimecmp == mtime) mtime <= 0;
-          else mtime <= mtime + 1;
+        if(!(is_store && alu_out == MTIME_ADDR) && !csr_reg.mip.mtip && csr_reg.mie.mtie) begin
+          mtime <= mtime + 1;
         end
 
         // atomic operation
@@ -559,22 +562,22 @@ module riscv(
           end
 
           i_amomax:begin
-            mem[a] <= ($signed(mem[a]) > $signed(b)) ? mem[a] : b;
+            mem[a] <= ($signed(mem[a]) > $signed(b)) ? mem[a] : mem[b];
             //if(rd != 0) regfile[rd] <= mem[a]; 
           end 
 
           i_amomaxu:begin
-            mem[a] <= (mem[a] > b) ? mem[a] : b;
+            mem[a] <= (a > b) ? mem[a] : mem[b];
             //if(rd != 0) regfile[rd] <= mem[a]; 
           end
 
           i_amomin:begin
-            mem[a] <= ($signed(mem[a]) > $signed(b)) ? b : mem[a];
+            mem[a] <= ($signed(mem[a]) > $signed(b)) ? mem[b] : mem[a];
             //if(rd != 0) regfile[rd] <= mem[a]; 
           end
 
           i_amominu:begin
-            mem[a] <= (mem[a] > b) ? b : mem[a];
+            mem[a] <= (a > b) ? mem[b] : mem[a];
             //if(rd != 0) regfile[rd] <= mem[a];  
           end
 
@@ -592,10 +595,251 @@ module riscv(
             mem[a] <= mem[a] ^ b;
             //if(rd != 0) regfile[rd] <= mem[a]; 
           end
+
+          i_sc:begin
+            if(reservation_reg == a)begin
+              mem[a] <= b;            
+            end
+          end
+
           default:;
         endcase
 
       end
+    end
+
+    // control csr register
+    csr_reg_t csr_reg = {0,0,0,0,0,0,0};
+
+    always_ff @ (posedge clk) begin
+      if(reset)begin
+        csr_reg.mstatus.mpp <= 2'b11; // machine mode only
+      end
+
+      case(1'b1)
+        i_csrrw:begin
+          case(csr)
+            MSTATUS_ADDR: begin
+              csr_reg.mstatus <= a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
+            end
+            MIE_ADDR: begin
+              csr_reg.mie <= a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mie; 
+            end
+            MTVEC_ADDR: begin 
+              csr_reg.mtvec <= a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mtvec;
+            end
+            MEPC_ADDR: begin
+              csr_reg.mepc <= a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mepc;
+            end 
+            MCAUSE_ADDR: begin
+              csr_reg.mcause <= a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mcause;
+            end 
+            MTVAL_ADDR: begin
+              csr_reg.mtval <= a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mtval;
+            end 
+            MIP_ADDR: begin
+              csr_reg.mip <= a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mip;
+            end    
+            default:;
+          endcase
+        end
+
+        i_csrrs:begin
+          case(csr)
+            MSTATUS_ADDR: begin
+              csr_reg.mstatus <= csr_reg.mstatus | a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
+            end
+            MIE_ADDR: begin
+              csr_reg.mie <= csr_reg.mie | a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mie; 
+            end
+            MTVEC_ADDR: begin 
+              csr_reg.mtvec <= csr_reg.mtvec | a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mtvec;
+            end
+            MEPC_ADDR: begin
+              csr_reg.mepc <= csr_reg.mepc | a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mepc;
+            end 
+            MCAUSE_ADDR: begin
+              csr_reg.mcause <= csr_reg.mcause | a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mcause;
+            end 
+            MTVAL_ADDR: begin
+              csr_reg.mtval <= csr_reg.mtval | a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mtval;
+            end 
+            MIP_ADDR: begin
+              csr_reg.mip <= csr_reg.mip | a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mip;
+            end    
+            default:;
+          endcase
+        end
+        
+        i_csrrc :begin
+          case(csr)
+            MSTATUS_ADDR: begin
+              csr_reg.mstatus <= csr_reg.mstatus &~ a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
+            end
+            MIE_ADDR: begin
+              csr_reg.mie <= csr_reg.mie &~ a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mie; 
+            end
+            MTVEC_ADDR: begin 
+              csr_reg.mtvec <= csr_reg.mtvec &~ a; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mtvec;
+            end
+            MEPC_ADDR: begin
+              csr_reg.mepc <= csr_reg.mepc &~ a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mepc;
+            end 
+            MCAUSE_ADDR: begin
+              csr_reg.mcause <= csr_reg.mcause &~ a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mcause;
+            end 
+            MTVAL_ADDR: begin
+              csr_reg.mtval <= csr_reg.mtval &~ a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mtval;
+            end 
+            MIP_ADDR: begin
+              csr_reg.mip <= csr_reg.mip &~ a;
+              //if(rd != 0) regfile[rd] <= csr_reg.mip;
+            end    
+            default:;
+          endcase
+        end
+        
+        i_csrrwi:begin
+          case(csr)
+            MSTATUS_ADDR: begin
+             csr_reg.mstatus <= zimm; 
+             //if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
+            end
+            MIE_ADDR: begin
+             csr_reg.mie <= zimm; 
+             //if(rd != 0) regfile[rd] <= csr_reg.mie; 
+            end
+            MTVEC_ADDR: begin 
+             csr_reg.mtvec <= zimm; 
+             //if(rd != 0) regfile[rd] <= csr_reg.mtvec;
+            end
+            MEPC_ADDR: begin
+             csr_reg.mepc <= zimm;
+             //if(rd != 0) regfile[rd] <= csr_reg.mepc;
+            end 
+            MCAUSE_ADDR: begin
+             csr_reg.mcause <= zimm;
+             //if(rd != 0) regfile[rd] <= csr_reg.mcause;
+            end 
+            MTVAL_ADDR: begin
+             csr_reg.mtval <= zimm;
+             //if(rd != 0) regfile[rd] <= csr_reg.mtval;
+            end 
+            MIP_ADDR: begin
+             csr_reg.mip <= zimm;
+             //if(rd != 0) regfile[rd] <= csr_reg.mip;
+            end    
+            default:;
+          endcase         
+        end
+        
+        i_csrrsi:begin
+          case(csr)
+            MSTATUS_ADDR: begin
+             csr_reg.mstatus <= csr_reg.mstatus | zimm; 
+             //if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
+            end
+            MIE_ADDR: begin
+             csr_reg.mie <= csr_reg.mstatus | zimm; 
+             //if(rd != 0) regfile[rd] <= csr_reg.mie; 
+            end
+            MTVEC_ADDR: begin 
+             csr_reg.mtvec <= csr_reg.mstatus | zimm; 
+             //if(rd != 0) regfile[rd] <= csr_reg.mtvec;
+            end
+            MEPC_ADDR: begin
+             csr_reg.mepc <= csr_reg.mstatus | zimm;
+             //if(rd != 0) regfile[rd] <= csr_reg.mepc;
+            end 
+            MCAUSE_ADDR: begin
+             csr_reg.mcause <= csr_reg.mstatus | zimm;
+             //if(rd != 0) regfile[rd] <= csr_reg.mcause;
+            end 
+            MTVAL_ADDR: begin
+             csr_reg.mtval <= csr_reg.mstatus | zimm;
+             //if(rd != 0) regfile[rd] <= csr_reg.mtval;
+            end 
+            MIP_ADDR: begin
+             csr_reg.mip <= csr_reg.mstatus | zimm;
+             //if(rd != 0) regfile[rd] <= csr_reg.mip;
+            end    
+            default:;
+          endcase         
+        end
+        
+        i_csrrci:begin
+          case(csr)
+            MSTATUS_ADDR: begin
+              csr_reg.mstatus <= csr_reg.mstatus &~ zimm; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
+            end
+            MIE_ADDR: begin
+              csr_reg.mie <= csr_reg.mie &~ zimm; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mie; 
+            end
+            MTVEC_ADDR: begin 
+              csr_reg.mtvec <= csr_reg.mtvec &~ zimm; 
+              //if(rd != 0) regfile[rd] <= csr_reg.mtvec;
+            end
+            MEPC_ADDR: begin
+              csr_reg.mepc <= csr_reg.mepc &~ zimm;
+              //if(rd != 0) regfile[rd] <= csr_reg.mepc;
+            end 
+            MCAUSE_ADDR: begin
+              csr_reg.mcause <= csr_reg.mcause &~ zimm;
+              //if(rd != 0) regfile[rd] <= csr_reg.mcause;
+            end 
+            MTVAL_ADDR: begin
+              csr_reg.mtval <= csr_reg.mtval &~ zimm;
+              //if(rd != 0) regfile[rd] <= csr_reg.mtval;
+            end 
+            MIP_ADDR: begin
+              csr_reg.mip <= csr_reg.mip &~ zimm;
+              //if(rd != 0) regfile[rd] <= csr_reg.mip;
+            end    
+            default:;
+          endcase
+        end
+        
+        i_mret:begin
+          csr_reg.mstatus.mpp <= 2'b11;  // machine mode only
+          csr_reg.mstatus.mie <= csr_reg.mstatus.mpie;
+          csr_reg.mstatus.mpie <= 1;  // enable insterrupt again
+        end 
+      endcase
+
+      if(csr_reg.mtvec.mode == 0) timer_int_addr <= {csr_reg.mtvec.base_addr, 2'b00};               // direct mode
+      else if(csr_reg.mtvec.mode == 1) timer_int_addr <= {csr_reg.mtvec.base_addr, 2'b00} + 28;     // vector mode
+
+      if(rise_timer_interrupt) begin  
+        if(csr_reg.mtvec.mode == 0) csr_reg.mcause.exception_code = 7;
+        
+        csr_reg.mcause.interrupt = 1;
+        csr_reg.mepc <= pc;
+        csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
+        csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
+      end
+
     end
     
     reg [31:0] write_back_data ;
@@ -613,13 +857,7 @@ module riscv(
     end
 
     // write back
-    csr_reg_t csr_reg = {0,0,0,0,0,0,0};
-
     always_ff @ (posedge clk) begin
-      if(reset)begin
-        csr_reg.mstatus.mpp <= 2'b11; // machine mode only
-      end
-      
       if (is_write_back && (rd != 0)) begin   // rd = 0 is zero register, so cannot write back.
         regfile[rd] <= write_back_data;                 
       end
@@ -628,31 +866,31 @@ module riscv(
         i_csrrw:begin
           case(csr)
             MSTATUS_ADDR: begin
-              csr_reg.mstatus <= a; 
+            //  csr_reg.mstatus <= a; 
               if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
             end
             MIE_ADDR: begin
-              csr_reg.mie <= a; 
+            //  csr_reg.mie <= a; 
               if(rd != 0) regfile[rd] <= csr_reg.mie; 
             end
             MTVEC_ADDR: begin 
-              csr_reg.mtvec <= a; 
+            //  csr_reg.mtvec <= a; 
               if(rd != 0) regfile[rd] <= csr_reg.mtvec;
             end
             MEPC_ADDR: begin
-              csr_reg.mepc <= a;
+            //  csr_reg.mepc <= a;
               if(rd != 0) regfile[rd] <= csr_reg.mepc;
             end 
             MCAUSE_ADDR: begin
-              csr_reg.mcause <= a;
+            //  csr_reg.mcause <= a;
               if(rd != 0) regfile[rd] <= csr_reg.mcause;
             end 
             MTVAL_ADDR: begin
-              csr_reg.mtval <= a;
+            //  csr_reg.mtval <= a;
               if(rd != 0) regfile[rd] <= csr_reg.mtval;
             end 
             MIP_ADDR: begin
-              csr_reg.mip <= a;
+            //  csr_reg.mip <= a;
               if(rd != 0) regfile[rd] <= csr_reg.mip;
             end    
             default:;
@@ -662,31 +900,31 @@ module riscv(
         i_csrrs:begin
           case(csr)
             MSTATUS_ADDR: begin
-              csr_reg.mstatus <= csr_reg.mstatus | a; 
+            //  csr_reg.mstatus <= csr_reg.mstatus | a; 
               if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
             end
             MIE_ADDR: begin
-              csr_reg.mie <= csr_reg.mie | a; 
+            //  csr_reg.mie <= csr_reg.mie | a; 
               if(rd != 0) regfile[rd] <= csr_reg.mie; 
             end
             MTVEC_ADDR: begin 
-              csr_reg.mtvec <= csr_reg.mtvec | a; 
+            //  csr_reg.mtvec <= csr_reg.mtvec | a; 
               if(rd != 0) regfile[rd] <= csr_reg.mtvec;
             end
             MEPC_ADDR: begin
-              csr_reg.mepc <= csr_reg.mepc | a;
+            //  csr_reg.mepc <= csr_reg.mepc | a;
               if(rd != 0) regfile[rd] <= csr_reg.mepc;
             end 
             MCAUSE_ADDR: begin
-              csr_reg.mcause <= csr_reg.mcause | a;
+            //  csr_reg.mcause <= csr_reg.mcause | a;
               if(rd != 0) regfile[rd] <= csr_reg.mcause;
             end 
             MTVAL_ADDR: begin
-              csr_reg.mtval <= csr_reg.mtval | a;
+            //  csr_reg.mtval <= csr_reg.mtval | a;
               if(rd != 0) regfile[rd] <= csr_reg.mtval;
             end 
             MIP_ADDR: begin
-              csr_reg.mip <= csr_reg.mip | a;
+            //  csr_reg.mip <= csr_reg.mip | a;
               if(rd != 0) regfile[rd] <= csr_reg.mip;
             end    
             default:;
@@ -696,31 +934,31 @@ module riscv(
         i_csrrc :begin
           case(csr)
             MSTATUS_ADDR: begin
-              csr_reg.mstatus <= csr_reg.mstatus &~ a; 
+            //  csr_reg.mstatus <= csr_reg.mstatus &~ a; 
               if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
             end
             MIE_ADDR: begin
-              csr_reg.mie <= csr_reg.mie &~ a; 
+            //  csr_reg.mie <= csr_reg.mie &~ a; 
               if(rd != 0) regfile[rd] <= csr_reg.mie; 
             end
             MTVEC_ADDR: begin 
-              csr_reg.mtvec <= csr_reg.mtvec &~ a; 
+            //  csr_reg.mtvec <= csr_reg.mtvec &~ a; 
               if(rd != 0) regfile[rd] <= csr_reg.mtvec;
             end
             MEPC_ADDR: begin
-              csr_reg.mepc <= csr_reg.mepc &~ a;
+            //  csr_reg.mepc <= csr_reg.mepc &~ a;
               if(rd != 0) regfile[rd] <= csr_reg.mepc;
             end 
             MCAUSE_ADDR: begin
-              csr_reg.mcause <= csr_reg.mcause &~ a;
+            //  csr_reg.mcause <= csr_reg.mcause &~ a;
               if(rd != 0) regfile[rd] <= csr_reg.mcause;
             end 
             MTVAL_ADDR: begin
-              csr_reg.mtval <= csr_reg.mtval &~ a;
+            //  csr_reg.mtval <= csr_reg.mtval &~ a;
               if(rd != 0) regfile[rd] <= csr_reg.mtval;
             end 
             MIP_ADDR: begin
-              csr_reg.mip <= csr_reg.mip &~ a;
+            //  csr_reg.mip <= csr_reg.mip &~ a;
               if(rd != 0) regfile[rd] <= csr_reg.mip;
             end    
             default:;
@@ -730,31 +968,31 @@ module riscv(
         i_csrrwi:begin
           case(csr)
             MSTATUS_ADDR: begin
-             csr_reg.mstatus <= zimm; 
+            //  csr_reg.mstatus <= zimm; 
              if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
             end
             MIE_ADDR: begin
-             csr_reg.mie <= zimm; 
+            // csr_reg.mie <= zimm; 
              if(rd != 0) regfile[rd] <= csr_reg.mie; 
             end
             MTVEC_ADDR: begin 
-             csr_reg.mtvec <= zimm; 
+            // csr_reg.mtvec <= zimm; 
              if(rd != 0) regfile[rd] <= csr_reg.mtvec;
             end
             MEPC_ADDR: begin
-             csr_reg.mepc <= zimm;
+            // csr_reg.mepc <= zimm;
              if(rd != 0) regfile[rd] <= csr_reg.mepc;
             end 
             MCAUSE_ADDR: begin
-             csr_reg.mcause <= zimm;
+            // csr_reg.mcause <= zimm;
              if(rd != 0) regfile[rd] <= csr_reg.mcause;
             end 
             MTVAL_ADDR: begin
-             csr_reg.mtval <= zimm;
+            // csr_reg.mtval <= zimm;
              if(rd != 0) regfile[rd] <= csr_reg.mtval;
             end 
             MIP_ADDR: begin
-             csr_reg.mip <= zimm;
+            // csr_reg.mip <= zimm;
              if(rd != 0) regfile[rd] <= csr_reg.mip;
             end    
             default:;
@@ -764,31 +1002,31 @@ module riscv(
         i_csrrsi:begin
           case(csr)
             MSTATUS_ADDR: begin
-             csr_reg.mstatus <= csr_reg.mstatus | zimm; 
+            // csr_reg.mstatus <= csr_reg.mstatus | zimm; 
              if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
             end
             MIE_ADDR: begin
-             csr_reg.mie <= csr_reg.mstatus | zimm; 
+            // csr_reg.mie <= csr_reg.mstatus | zimm; 
              if(rd != 0) regfile[rd] <= csr_reg.mie; 
             end
             MTVEC_ADDR: begin 
-             csr_reg.mtvec <= csr_reg.mstatus | zimm; 
+            // csr_reg.mtvec <= csr_reg.mstatus | zimm; 
              if(rd != 0) regfile[rd] <= csr_reg.mtvec;
             end
             MEPC_ADDR: begin
-             csr_reg.mepc <= csr_reg.mstatus | zimm;
+            // csr_reg.mepc <= csr_reg.mstatus | zimm;
              if(rd != 0) regfile[rd] <= csr_reg.mepc;
             end 
             MCAUSE_ADDR: begin
-             csr_reg.mcause <= csr_reg.mstatus | zimm;
+            // csr_reg.mcause <= csr_reg.mstatus | zimm;
              if(rd != 0) regfile[rd] <= csr_reg.mcause;
             end 
             MTVAL_ADDR: begin
-             csr_reg.mtval <= csr_reg.mstatus | zimm;
+            // csr_reg.mtval <= csr_reg.mstatus | zimm;
              if(rd != 0) regfile[rd] <= csr_reg.mtval;
             end 
             MIP_ADDR: begin
-             csr_reg.mip <= csr_reg.mstatus | zimm;
+            // csr_reg.mip <= csr_reg.mstatus | zimm;
              if(rd != 0) regfile[rd] <= csr_reg.mip;
             end    
             default:;
@@ -798,95 +1036,99 @@ module riscv(
         i_csrrci:begin
           case(csr)
             MSTATUS_ADDR: begin
-              csr_reg.mstatus <= csr_reg.mstatus &~ zimm; 
+            //  csr_reg.mstatus <= csr_reg.mstatus &~ zimm; 
               if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
             end
             MIE_ADDR: begin
-              csr_reg.mie <= csr_reg.mie &~ zimm; 
+            //  csr_reg.mie <= csr_reg.mie &~ zimm; 
               if(rd != 0) regfile[rd] <= csr_reg.mie; 
             end
             MTVEC_ADDR: begin 
-              csr_reg.mtvec <= csr_reg.mtvec &~ zimm; 
+            //  csr_reg.mtvec <= csr_reg.mtvec &~ zimm; 
               if(rd != 0) regfile[rd] <= csr_reg.mtvec;
             end
             MEPC_ADDR: begin
-              csr_reg.mepc <= csr_reg.mepc &~ zimm;
+            //  csr_reg.mepc <= csr_reg.mepc &~ zimm;
               if(rd != 0) regfile[rd] <= csr_reg.mepc;
             end 
             MCAUSE_ADDR: begin
-              csr_reg.mcause <= csr_reg.mcause &~ zimm;
+            //  csr_reg.mcause <= csr_reg.mcause &~ zimm;
               if(rd != 0) regfile[rd] <= csr_reg.mcause;
             end 
             MTVAL_ADDR: begin
-              csr_reg.mtval <= csr_reg.mtval &~ zimm;
+            //  csr_reg.mtval <= csr_reg.mtval &~ zimm;
               if(rd != 0) regfile[rd] <= csr_reg.mtval;
             end 
             MIP_ADDR: begin
-              csr_reg.mip <= csr_reg.mip &~ zimm;
+            //  csr_reg.mip <= csr_reg.mip &~ zimm;
               if(rd != 0) regfile[rd] <= csr_reg.mip;
             end    
             default:;
           endcase
         end
         
-        i_mret:begin
-          csr_reg.mstatus.mpp <= 2'b11;  // machine mode only
-          csr_reg.mstatus.mie <= csr_reg.mstatus.mpie;
-          csr_reg.mstatus.mpie <= 1;  // enable insterrupt again
-        end 
-
         // atomic operation
         i_amoadd:begin
           //mem[a] <= mem[a] + b;
           if(rd != 0) regfile[rd] <= mem[a];
         end
+
         i_amoand:begin
           //mem[a] <= mem[a] & b;
           if(rd != 0) regfile[rd] <= mem[a]; 
         end
+
         i_amomax:begin
           //mem[a] <= ($signed(mem[a]) > $signed(b)) ? $signed(mem[a]) : $signed(mem[b]);
           if(rd != 0) regfile[rd] <= mem[a]; 
         end 
+
         i_amomaxu:begin
           //mem[a] <= (a > b) ? $signed(mem[a]) : $signed(mem[b]);
           if(rd != 0) regfile[rd] <= mem[a]; 
         end
+
         i_amomin:begin
           //mem[a] <= ($signed(mem[a]) > $signed(b)) ? $signed(mem[b]) : $signed(mem[a]);
           if(rd != 0) regfile[rd] <= mem[a]; 
         end
+
         i_amominu:begin
           //mem[a] <= (a > b) ? $signed(mem[b]) : $signed(mem[a]);
           if(rd != 0) regfile[rd] <= mem[a];  
         end
+
         i_amomor:begin
           //mem[a] <= mem[a] | b;
           if(rd != 0) regfile[rd] <= mem[a]; 
         end
+
         i_amoswap:begin
           //mem[a] <= b;
           if(rd != 0) regfile[rd] <= mem[a]; 
         end
+
         i_amoxor:begin
           //mem[a] <= mem[a] ^ b;
           if(rd != 0) regfile[rd] <= mem[a]; 
         end
 
+
+        i_sc:begin
+          if(reservation_reg == a)begin
+            if(rd != 0) regfile[rd] <= 0;         
+          end else begin
+            if(rd != 0) regfile[rd] <= 1;         
+          end
+        end
+
+        i_lr:begin
+          reservation_reg <= a;
+          if(rd != 0) regfile[rd] <= mem[a];
+        end
+
         default:;
       endcase
-
-      if(csr_reg.mtvec.mode == 0) timer_int_addr <= {csr_reg.mtvec.base_addr, 2'b00};               // direct mode
-      else if(csr_reg.mtvec.mode == 1) timer_int_addr <= {csr_reg.mtvec.base_addr, 2'b00} + 28;     // vector mode
-
-      if(rise_timer_interrupt) begin  
-        if(csr_reg.mtvec.mode == 0) csr_reg.mcause.exception_code = 7;
-        
-        csr_reg.mcause.interrupt = 1;
-        csr_reg.mepc <= pc;
-        csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-        csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
-      end
 
     end
 
