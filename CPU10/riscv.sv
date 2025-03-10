@@ -492,7 +492,7 @@ module riscv(
           is_mret = 1;
         end
 
-        i_amoadd, i_amoand, i_amomax, i_amomaxu, i_amomin, i_amominu, i_amomor, i_amoswap, i_amoxor:begin
+        i_amoadd, i_amoand, i_amomax, i_amomaxu, i_amomin, i_amominu, i_amomor, i_amoswap, i_amoxor, i_sc, i_lr:begin
           is_atomic = 1;  
         end
 
