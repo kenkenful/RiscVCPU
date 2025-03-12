@@ -4,8 +4,8 @@
 	.global _end
 	.extern main
 
-	intr_stack_top = 0x2bff
-	user_stack_top = 0x2fff
+	intr_stack_top = 0x2c00
+	user_stack_top = 0x3000
 
 _start:
 	j  init_reg
