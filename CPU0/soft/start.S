@@ -44,7 +44,7 @@ init_reg:
 	li  x29, 0
 	li  x30, 0
 	li  x31, 0
-	li	sp, 0x3fff
+	li	sp, stack_top
 
 call_main:
 	call  main
