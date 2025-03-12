@@ -4,7 +4,7 @@
 	.global _end
 	.extern main
 
-	stack_top = 0x3fff
+	stack_top = 0x4000
 
 _start:
 	j  init_reg
