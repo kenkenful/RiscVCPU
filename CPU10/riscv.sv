@@ -536,7 +536,7 @@ module riscv(
 
         i_amoadd, i_amoand, i_amomax, i_amomaxu, i_amomin, i_amominu, i_amomor, i_amoswap, i_amoxor, i_sc, i_lr:begin
           is_atomic = 1;  
-          if(a[1:0] != 2'b00)begin
+          if(a[1:0] != 2'b00)begin    // miss align
             raise_exception = 1;
             store_atomic_addr_miss_align = 1;
             is_atomic = 0;
@@ -624,13 +624,55 @@ module riscv(
     end
   end
 
-  // control csr register
-  csr_reg_t csr_reg = {0,0,0,0,0,0,0};
+  // csr register
+  csr_reg_t csr_reg = {0,0,0,0,0,0,0,0,0};
+
+  reg [1:0] mpp_prev = 0;
 
   always_ff @ (posedge clk) begin
     if(reset)begin
-      csr_reg.mstatus.mpp <= MACHINE_MODE; // machine mode only
-    end else if(is_csr)begin
+      csr_reg.mstatus.mpp <= MACHINE_MODE; // machine mode
+    end else 
+    if(load_addr_miss_align)begin
+      csr_reg.mcause.exception_code <= LOAD_ADDR_MISSALIGNED;
+      mpp_prev <= csr_reg.mstatus.mpp;
+      csr_reg.mstatus.mpp <= MACHINE_MODE;
+      csr_reg.mepc <= pc;
+      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
+      csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
+    end 
+    else if(store_atomic_addr_miss_align)begin
+      csr_reg.mcause.exception_code <= STORE_AMO_ADDR_MISSALIGN;
+      mpp_prev <= csr_reg.mstatus.mpp;
+      csr_reg.mstatus.mpp <= MACHINE_MODE;
+      csr_reg.mepc <= pc;
+      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
+      csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
+    end 
+    else if(ecall_exception)begin
+      csr_reg.mcause.exception_code <= (csr_reg.mstatus.mpp == MACHINE_MODE) ? ECALL_ENVIROMENT_FROM_M : 
+                                       (csr_reg.mstatus.mpp == USER_MODE) ? ECALL_ENVIROMENT_FROM_U : ECALL_ENVIROMENT_FROM_S;
+      mpp_prev <= csr_reg.mstatus.mpp;
+      csr_reg.mstatus.mpp <= MACHINE_MODE;
+      csr_reg.mepc <= pc;
+      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
+      csr_reg.mstatus.mie <= 0;    // interrupt is not supported when exception.
+    end 
+    else if(rise_timer_interrupt) begin  
+      if(csr_reg.mtvec.mode == 0) csr_reg.mcause.exception_code <= MACHINE_TIMER_INTERRUPT;
+      mpp_prev <= csr_reg.mstatus.mpp;
+      csr_reg.mstatus.mpp <= MACHINE_MODE;
+      csr_reg.mcause.interrupt <= 1;
+      csr_reg.mepc <= pc;
+      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
+      csr_reg.mstatus.mie <= 0;    // interrupt is not supported when exception.
+    end 
+    else if(is_mret)begin
+      csr_reg.mstatus.mpp <= mpp_prev; 
+      csr_reg.mstatus.mie <= csr_reg.mstatus.mpie;
+      csr_reg.mstatus.mpie <= 1;  // enable insterrupt again
+    end 
+    else if(is_csr)begin
       case(1'b1)
         i_csrrw:begin
           case(csr)
@@ -723,56 +765,7 @@ module riscv(
         end
         default:;
       endcase      
-    end else begin
-      case(1'b1)
-        i_mret:begin
-          csr_reg.mstatus.mpp <= MACHINE_MODE;  // machine mode only
-          csr_reg.mstatus.mie <= csr_reg.mstatus.mpie;
-          csr_reg.mstatus.mpie <= 1;  // enable insterrupt again
-        end
-        //i_ecall:begin
-        //  csr_reg.mcause.exception_code <= (csr_reg.mstatus.mpp == MACHINE_MODE) ? ECALL_ENVIROMENT_FROM_M : 
-        //                                    (csr_reg.mstatus.mpp == USER_MODE) ? ECALL_ENVIROMENT_FROM_U : ECALL_ENVIROMENT_FROM_S;
-        //  csr_reg.mstatus.mpp <= MACHINE_MODE;
-        //  csr_reg.mepc <= pc;
-        //  csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-        //  csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
-        //end
-        default:;
-      endcase
     end
-
-     if(load_addr_miss_align)begin
-      csr_reg.mcause.exception_code <= LOAD_ADDR_MISSALIGNED;
-      csr_reg.mstatus.mpp <= MACHINE_MODE;
-      csr_reg.mepc <= pc;
-      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-      csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
-    end else 
-    if(store_atomic_addr_miss_align)begin
-      csr_reg.mcause.exception_code <= STORE_AMO_ADDR_MISSALIGN;
-      csr_reg.mstatus.mpp <= MACHINE_MODE;
-      csr_reg.mepc <= pc;
-      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-      csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
-    end else 
-    if(ecall_exception)begin
-      csr_reg.mcause.exception_code <= (csr_reg.mstatus.mpp == MACHINE_MODE) ? ECALL_ENVIROMENT_FROM_M : 
-                                        (csr_reg.mstatus.mpp == USER_MODE) ? ECALL_ENVIROMENT_FROM_U : ECALL_ENVIROMENT_FROM_S;
-      csr_reg.mstatus.mpp <= MACHINE_MODE;
-      csr_reg.mepc <= pc;
-      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-      csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
-    end
-    else if(rise_timer_interrupt) begin  
-      if(csr_reg.mtvec.mode == 0) csr_reg.mcause.exception_code <= MACHINE_TIMER_INTERRUPT;
-      csr_reg.mstatus.mpp <= MACHINE_MODE;
-      csr_reg.mcause.interrupt <= 1;
-      csr_reg.mepc <= pc;
-      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-      csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
-    end
-
   end
     
   reg [31:0] write_back_data ;
@@ -792,7 +785,7 @@ module riscv(
     if (is_write_back && (rd != 0)) begin   // rd = 0 is zero register, so cannot write back.
       regfile[rd] <= write_back_data;                 
     end else if(is_csr)begin
-      case(csr)
+      case(csr)  // i_csrrw, i_csrrs, i_csrrc, i_csrrwi, i_csrrsi, i_csrrci
         MSTATUS_ADDR: if(rd != 0) regfile[rd] <= csr_reg.mstatus; 
         MIE_ADDR:     if(rd != 0) regfile[rd] <= csr_reg.mie; 
         MTVEC_ADDR:   if(rd != 0) regfile[rd] <= csr_reg.mtvec;
@@ -807,10 +800,13 @@ module riscv(
     end else if(is_atomic)begin
     // atomic operation
       case(1'b1)
-        i_amoadd, i_amoand, i_amomax, i_amomaxu, i_amomin, i_amominu, i_amomor, i_amoswap, i_amoxor:  if(rd != 0) regfile[rd] <= mem[a]; 
+        i_amoadd, i_amoand, i_amomax, i_amomaxu, i_amomin, i_amominu, i_amomor, i_amoswap, i_amoxor:  
+          if(rd != 0) regfile[rd] <= mem[a]; 
         i_sc:begin
-          if(reservation_reg == a) if(rd != 0) regfile[rd] <= 0;         
-          else if(rd != 0) regfile[rd] <= 1;       
+          if(reservation_reg == a)
+            if(rd != 0) regfile[rd] <= 0;         
+          else 
+            if(rd != 0) regfile[rd] <= 1;       
         end
         i_lr:begin
           reservation_reg <= a;
