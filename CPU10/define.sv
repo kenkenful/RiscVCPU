@@ -45,7 +45,11 @@ parameter MTVAL_ADDR     = 12'h343;
 parameter MIP_ADDR       = 12'h344;
 
 parameter PMPCFG0        = 12'h3A0;
+
 parameter PMPADDR0       = 12'h3B0;
+parameter PMPADDR1       = 12'h3B1;
+parameter PMPADDR2       = 12'h3B2;
+parameter PMPADDR3       = 12'h3B3;
 
 parameter MVENDORID_ADDR = 12'hF11;
 parameter MARCHID_ADDR   = 12'hF12;
@@ -112,8 +116,11 @@ typedef struct packed{
 } mip_t;
 
 typedef struct packed{
+  bit[31:0]  pmpaddr3;
+  bit[31:0]  pmpaddr2;
+  bit[31:0]  pmpaddr1;
   bit[31:0]  pmpaddr0;
-  bit[31:0]  pmpcfg0;
+  bit[31:0]  pmpcfg0;     // pmp3cfg/pmp2cfg/pmp1cfg/pmp0cfg
   mstatus_t  mstatus;
   mie_t      mie;
   mtvec_t    mtvec;
