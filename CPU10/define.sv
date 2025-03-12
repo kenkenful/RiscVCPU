@@ -1,11 +1,37 @@
 `ifndef _define_
 `define _define_
 
+// CPU mode
+parameter USER_MODE     = 2'b00;
+parameter MACHINE_MODE  = 2'b11;
+
+//　interrupt mode
+parameter VECTOR_MODE = 1;
+parameter DIRECT_MODE = 0;
+
+// INTERRUPT_CODE
+parameter MACHINE_TIMER_INTERRUPT    = 7;
+
+
+// Exception Code
+parameter INSTRUCTION_ADDR_MISSALIGN = 0;
+parameter INSTRUCTION_ACCESS_FAULT   = 1;
+parameter ILLEGAL_INSTRUCTION        = 2;
+parameter BREAKPOINT                 = 3;
+parameter LOAD_ADDR_MISSALIGNED      = 4;
+parameter LOAD_ACCESS_FAULT          = 5;
+parameter STORE_AMO_ADDR_MISSALIGN   = 6;
+parameter STORE_AMO_ACCESS_FAULT     = 7;
+parameter ECALL_ENVIROMENT_FROM_U    = 8;
+parameter ECALL_ENVIROMENT_FROM_S    = 9;
+parameter ECALL_ENVIROMENT_FROM_M    = 11;
+
 
 // memory mapped
-parameter UART_TX_ADDR  = 32'h20000000;
-parameter MTIME_ADDR    = 32'h20000020;
-parameter MTIMECMP_ADDR = 32'h20000040;
+parameter MEMMAP_BASE_ADDR  = 32'h20000000;
+parameter UART_TX_ADDR      = 32'h20000010;
+parameter MTIME_ADDR        = 32'h20000020;
+parameter MTIMECMP_ADDR     = 32'h20000040;
 
 // csr register
 parameter MSTATUS_ADDR  = 32'h300;
