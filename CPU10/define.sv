@@ -2,8 +2,9 @@
 `define _define_
 
 // CPU mode
-parameter USER_MODE     = 2'b00;
-parameter MACHINE_MODE  = 2'b11;
+parameter USER_MODE       = 2'b00;
+parameter HYPERVISOR_MODE = 2'b01;
+parameter MACHINE_MODE    = 2'b11;
 
 //　interrupt mode
 parameter VECTOR_MODE = 1;
@@ -34,13 +35,23 @@ parameter MTIME_ADDR        = 32'h20000020;
 parameter MTIMECMP_ADDR     = 32'h20000040;
 
 // csr register
-parameter MSTATUS_ADDR  = 32'h300;
-parameter MIE_ADDR      = 32'h304;
-parameter MTVEC_ADDR    = 32'h305;
-parameter MEPC_ADDR     = 32'h341;
-parameter MCAUSE_ADDR   = 32'h342;
-parameter MTVAL_ADDR    = 32'h343;
-parameter MIP_ADDR      = 32'h344;
+parameter MSTATUS_ADDR   = 12'h300;
+parameter MISA_ADDR      = 12'h301;
+parameter MIE_ADDR       = 12'h304;
+parameter MTVEC_ADDR     = 12'h305;
+parameter MEPC_ADDR      = 12'h341;
+parameter MCAUSE_ADDR    = 12'h342;
+parameter MTVAL_ADDR     = 12'h343;
+parameter MIP_ADDR       = 12'h344;
+
+parameter PMPCFG0        = 12'h3A0;
+parameter PMPADDR0       = 12'h3B0;
+
+parameter MVENDORID_ADDR = 12'hF11;
+parameter MARCHID_ADDR   = 12'hF12;
+parameter MIMPID_ADDR    = 12'hF13;
+parameter MHART_ADDR     = 12'hF14;
+
 
 typedef struct packed{
   bit[20:0]   reserve0;   // 13-31
@@ -101,6 +112,8 @@ typedef struct packed{
 } mip_t;
 
 typedef struct packed{
+  bit[31:0]  pmpaddr0;
+  bit[31:0]  pmpcfg0;
   mstatus_t  mstatus;
   mie_t      mie;
   mtvec_t    mtvec;
