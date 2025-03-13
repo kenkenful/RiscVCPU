@@ -28,9 +28,6 @@ module riscv(
     end
     endfunction
 
-
-
-
     // Distributed RAM
     localparam data_width = 32;
     localparam addr_width = 11;
