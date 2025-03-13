@@ -26,6 +26,10 @@ parameter STORE_AMO_ACCESS_FAULT     = 7;
 parameter ECALL_ENVIROMENT_FROM_U    = 8;
 parameter ECALL_ENVIROMENT_FROM_S    = 9;
 parameter ECALL_ENVIROMENT_FROM_M    = 11;
+parameter INSTRUCTION_PAGE_FAULT     = 12;
+parameter LOAD_PAGE_FAULT            = 13;
+parameter STORE_AMO_PAGE_FAULT       = 15;
+parameter NOT_DEFINED                = 16;
 
 
 // memory mapped
@@ -55,6 +59,12 @@ parameter MVENDORID_ADDR = 12'hF11;
 parameter MARCHID_ADDR   = 12'hF12;
 parameter MIMPID_ADDR    = 12'hF13;
 parameter MHART_ADDR     = 12'hF14;
+
+// pmp
+parameter PMP_NAPOT      = 8'h18;
+parameter PMP_X          = 8'h4;
+parameter PMP_W          = 8'h2;
+parameter PMP_R          = 8'h1;
 
 
 typedef struct packed{

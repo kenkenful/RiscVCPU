@@ -13,6 +13,24 @@ module riscv(
     output reg uart_en;
     output reg [7:0] uart_tx_data;
 
+    function [3:0] ex_order(input [3:0] ex_code);
+    begin
+      case (ex_code)
+        BREAKPOINT: ex_order = 10;
+        INSTRUCTION_PAGE_FAULT: ex_order = 9;
+        INSTRUCTION_ACCESS_FAULT: ex_order = 8;
+        ILLEGAL_INSTRUCTION, INSTRUCTION_ADDR_MISSALIGN, ECALL_ENVIROMENT_FROM_U, ECALL_ENVIROMENT_FROM_S, ECALL_ENVIROMENT_FROM_M, BREAKPOINT: ex_order = 7;
+        STORE_AMO_ADDR_MISSALIGN, LOAD_ADDR_MISSALIGNED: ex_order = 6;
+        LOAD_PAGE_FAULT, STORE_AMO_PAGE_FAULT: ex_order = 5;
+        LOAD_ACCESS_FAULT, STORE_AMO_ACCESS_FAULT: ex_order = 4;
+        default:ex_order = 0;
+      endcase
+    end
+    endfunction
+
+
+
+
     // Distributed RAM
     localparam data_width = 32;
     localparam addr_width = 11;
@@ -39,17 +57,15 @@ module riscv(
 
     wire [31:0] timer_int_addr = (csr_reg.mtvec.mode == VECTOR_MODE) ? {csr_reg.mtvec.base_addr, 2'b00} + 28 : {csr_reg.mtvec.base_addr, 2'b00};
     wire [31:0] exception_addr = {csr_reg.mtvec.base_addr, 2'b00};
-
-    wire [31:0] pc_plus = pc + 4;
-    
+    wire [31:0] pc_plus = pc + 4;    
     reg [31:0] next_pc;
 
     always_comb begin
-      if(raise_exception) next_pc = exception_addr;
-      else if(rise_timer_interrupt) next_pc = timer_int_addr;
-      else if(is_mret)         next_pc = csr_reg.mepc;      
-      else if(is_jump)         next_pc = jump_addr;
-      else                     next_pc = pc_plus;
+      if(is_exception)               next_pc = exception_addr;
+      else if(raise_timer_interrupt) next_pc = timer_int_addr;
+      else if(is_mret)               next_pc = csr_reg.mepc;      
+      else if(is_jump)               next_pc = jump_addr;
+      else                           next_pc = pc_plus;
     end
 
     // pc
@@ -158,9 +174,9 @@ module riscv(
     wire i_sc      = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b00011);
     wire i_lr      = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b00010);
 
-    reg    [31:0] regfile [1:31];                  //  regfile[0] is zero register.  
-    wire   [31:0] a = (rs1==0) ? 0 : regfile[rs1]; //  index 0 is zero register, so return 0. 
-    wire   [31:0] b = (rs2==0) ? 0 : regfile[rs2]; //  index 0 is zero register, so return 0.
+    reg    [31:0] regfile [1:31];                  // regfile[0] is zero register.  
+    wire   [31:0] a = (rs1==0) ? 0 : regfile[rs1]; // index 0 is zero register, so return 0. 
+    wire   [31:0] b = (rs2==0) ? 0 : regfile[rs2]; // index 0 is zero register, so return 0.
     
     // execute
     reg [31:0] store_data;
@@ -177,33 +193,29 @@ module riscv(
     reg is_csr;
     reg is_atomic;
 
-    reg raise_exception;
-    reg ecall_exception;
-    reg load_addr_miss_align;
-    reg store_atomic_addr_miss_align;
-    reg atomin_addr_miss_aligned;
+    reg is_exception = 0; 
+    reg [3:0] exception_type = NOT_DEFINED;
 
     always_comb begin        
-      alu_out = 0;         
-      mem_addr  = 0;       
-      is_write_back = 0;   
-      wmem = 0;            
-      rmem = 0;
-      store_data = b; 
-      uart_en = 0;
-      uart_tx_data = 0;
-      jump_addr = 0;
-      mul = 0;
-      is_load = 0;
-      is_store = 0;
-      is_jump = 0;
-      is_mret = 0;
-      is_csr = 0;
-      is_atomic = 0;
-      raise_exception = 0;
-      load_addr_miss_align = 0;
-      store_atomic_addr_miss_align = 0;
-      ecall_exception = 0;
+      alu_out        = 0;         
+      mem_addr       = 0;       
+      is_write_back  = 0;   
+      wmem           = 0;            
+      rmem           = 0;
+      store_data     = b; 
+      uart_en        = 0;
+      uart_tx_data   = 0;
+      jump_addr      = 0;
+      mul            = 0;
+      is_load        = 0;
+      is_store       = 0;
+      is_jump        = 0;
+      is_mret        = 0;
+      is_csr         = 0;
+      is_atomic      = 0;
+
+      is_exception = (pc[1:0] != 0) ? 1 : 0;
+      exception_type = (ex_order(INSTRUCTION_ADDR_MISSALIGN) > ex_order(exception_type)) ? INSTRUCTION_ADDR_MISSALIGN : exception_type;
 
       case (1'b1)
         i_add: begin                                   
@@ -307,9 +319,14 @@ module riscv(
           if(alu_out[1:0] != 2'b00)begin              // miss aligned
             is_write_back = 0;
             is_load = 0;
-            raise_exception = 1;
-            load_addr_miss_align = 1;
-          end              
+            is_exception = 1;
+            exception_type = (ex_order(LOAD_ADDR_MISSALIGNED) > ex_order(exception_type)) ? LOAD_ADDR_MISSALIGNED : exception_type;
+          end else if(curr_cpu_mode != MACHINE_MODE && (alu_out == MTIME_ADDR || alu_out == MTIMECMP_ADDR))begin
+            is_write_back = 0; 
+            is_load = 0;
+            is_exception = 1;
+            exception_type = (ex_order(LOAD_ACCESS_FAULT) > ex_order(exception_type)) ? LOAD_ACCESS_FAULT : exception_type;
+          end          
         end       
 
         i_lbu: begin                                   // load 1byte unsigned
@@ -337,8 +354,13 @@ module riscv(
           if(rmem == 5'b00110)begin   // miss aligned
             is_write_back = 0; 
             is_load = 0;
-            raise_exception = 1;
-            load_addr_miss_align = 1;
+            is_exception = 1;
+            exception_type = (ex_order(LOAD_ADDR_MISSALIGNED) > ex_order(exception_type)) ? LOAD_ADDR_MISSALIGNED : exception_type;
+          end else if(curr_cpu_mode != MACHINE_MODE && (alu_out == MTIME_ADDR || alu_out == MTIMECMP_ADDR))begin
+            is_write_back = 0; 
+            is_load = 0;
+            is_exception = 1;
+            exception_type = (ex_order(LOAD_ACCESS_FAULT) > ex_order(exception_type)) ? LOAD_ACCESS_FAULT : exception_type;
           end
         end
 
@@ -352,9 +374,14 @@ module riscv(
           if(rmem == 5'b10110)begin     // miss aligned
             is_write_back = 0; 
             is_load = 0;
-            raise_exception = 1;
-            load_addr_miss_align = 1;
-          end                
+            is_exception = 1;
+            exception_type = (ex_order(LOAD_ADDR_MISSALIGNED) > ex_order(exception_type)) ? LOAD_ADDR_MISSALIGNED : exception_type;
+          end else if(curr_cpu_mode != MACHINE_MODE && (alu_out == MTIME_ADDR || alu_out == MTIMECMP_ADDR))begin
+            is_write_back = 0; 
+            is_load = 0;
+            is_exception = 1;
+            exception_type = (ex_order(LOAD_ACCESS_FAULT) > ex_order(exception_type)) ? LOAD_ACCESS_FAULT : exception_type;
+          end         
         end
 
         i_sb: begin                                    // 1 byte store
@@ -391,10 +418,13 @@ module riscv(
 
           if(wmem == 4'b0110)begin                     // miss aligned
             is_store = 0;
-            raise_exception = 1;
-            store_atomic_addr_miss_align = 1;
-          end
-
+            is_exception = 1;
+            exception_type = (ex_order(STORE_AMO_ADDR_MISSALIGN) > ex_order(exception_type)) ? STORE_AMO_ADDR_MISSALIGN : exception_type;
+          end else if(curr_cpu_mode != MACHINE_MODE && (alu_out == MTIME_ADDR || alu_out == MTIMECMP_ADDR))begin
+            is_store = 0;
+            is_exception = 1;
+            exception_type = (ex_order(STORE_AMO_ACCESS_FAULT) > ex_order(exception_type)) ? STORE_AMO_ACCESS_FAULT : exception_type;
+          end 
         end
 
         i_sw: begin                                    // 4 bytes store
@@ -404,10 +434,13 @@ module riscv(
           is_store = 1;
           if(alu_out[1:0] != 2'b00)begin               // miss aligned
             is_store = 0;
-            raise_exception = 1;
-            store_atomic_addr_miss_align = 1;
+            is_exception = 1;
+            exception_type = (ex_order(STORE_AMO_ADDR_MISSALIGN) > ex_order(exception_type)) ? STORE_AMO_ADDR_MISSALIGN : exception_type;
+          end else if(curr_cpu_mode != MACHINE_MODE && (alu_out == MTIME_ADDR || alu_out == MTIMECMP_ADDR))begin
+            is_store = 0;
+            is_exception = 1;
+            exception_type = (ex_order(STORE_AMO_ACCESS_FAULT) > ex_order(exception_type)) ? STORE_AMO_ACCESS_FAULT : exception_type;
           end
-        
         end
 
         i_beq: begin                                   
@@ -528,6 +561,11 @@ module riscv(
 
         i_csrrw, i_csrrs, i_csrrc, i_csrrwi, i_csrrsi, i_csrrci:begin
           is_csr = 1;
+          if(curr_cpu_mode != MACHINE_MODE)begin
+            is_csr = 0;            
+            is_exception = 1;
+            exception_type = (ex_order(ILLEGAL_INSTRUCTION) > ex_order(exception_type)) ? ILLEGAL_INSTRUCTION : exception_type;
+          end
         end
 
         i_mret:begin
@@ -537,17 +575,27 @@ module riscv(
         i_amoadd, i_amoand, i_amomax, i_amomaxu, i_amomin, i_amominu, i_amomor, i_amoswap, i_amoxor, i_sc, i_lr:begin
           is_atomic = 1;  
           if(a[1:0] != 2'b00)begin    // miss align
-            raise_exception = 1;
-            store_atomic_addr_miss_align = 1;
             is_atomic = 0;
+            is_exception = 1;
+            exception_type = (ex_order(STORE_AMO_ADDR_MISSALIGN) > ex_order(exception_type)) ? STORE_AMO_ADDR_MISSALIGN : exception_type;
+
           end 
         end
 
         i_ecall:begin
-          raise_exception = 1;
-          ecall_exception = 1;
+          is_exception = 1;
+          if(curr_cpu_mode == MACHINE_MODE)
+            exception_type = (ex_order(ECALL_ENVIROMENT_FROM_M) > ex_order(exception_type)) ? ECALL_ENVIROMENT_FROM_M : exception_type;
+          else if(curr_cpu_mode == USER_MODE) 
+            exception_type = (ex_order(ECALL_ENVIROMENT_FROM_U) > ex_order(exception_type)) ? ECALL_ENVIROMENT_FROM_U : exception_type;
         end
 
+        i_ebreak:begin
+          is_exception = 1;
+          exception_type = (ex_order(BREAKPOINT) > ex_order(exception_type)) ? BREAKPOINT : exception_type;
+
+        end
+        
         default:;
       endcase
     end
@@ -579,8 +627,8 @@ module riscv(
       endcase
     end
     
-    wire rise_timer_interrupt = (mtimecmp == mtime && !csr_reg.mip.mtip && csr_reg.mie.mtie && csr_reg.mstatus.mie) ? 1: 0;
-                                                    //   not pending     enable timer interrupt   emable interrupt
+    wire raise_timer_interrupt = (mtimecmp <= mtime) & !csr_reg.mip.mtip & csr_reg.mie.mtie & csr_reg.mstatus.mie ? 1: 0;
+                                                    //                    enable timer interrupt   emable interrupt
     reg [63:0] mtime = 0;
     reg [63:0] mtimecmp = 0;
 
@@ -592,7 +640,7 @@ module riscv(
       mtime <= 0;
     end else begin
       if(is_store && alu_out == MTIME_ADDR) mtime <= store_data; 
-      else if(!(is_store && alu_out == MTIME_ADDR) && !csr_reg.mip.mtip && csr_reg.mie.mtie) mtime <= mtime + 1;
+      else if(!(is_store && alu_out == MTIME_ADDR) && csr_reg.mie.mtie) mtime <= mtime + 1;
     end
   end
 
@@ -625,52 +673,40 @@ module riscv(
   end
 
   // csr register
-  csr_reg_t csr_reg = {0,0,0,0,0,0,0,0,0};
+  csr_reg_t csr_reg = 0;
 
-  reg [1:0] mpp_prev = 0;
+  reg [1:0] curr_cpu_mode = MACHINE_MODE;
 
   always_ff @ (posedge clk) begin
     if(reset)begin
-      csr_reg.mstatus.mpp <= MACHINE_MODE; // machine mode
-    end else 
-    if(load_addr_miss_align)begin
-      csr_reg.mcause.exception_code <= LOAD_ADDR_MISSALIGNED;
-      mpp_prev <= csr_reg.mstatus.mpp;
-      csr_reg.mstatus.mpp <= MACHINE_MODE;
-      csr_reg.mepc <= pc;
-      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-      csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
-    end 
-    else if(store_atomic_addr_miss_align)begin
-      csr_reg.mcause.exception_code <= STORE_AMO_ADDR_MISSALIGN;
-      mpp_prev <= csr_reg.mstatus.mpp;
-      csr_reg.mstatus.mpp <= MACHINE_MODE;
-      csr_reg.mepc <= pc;
-      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-      csr_reg.mstatus.mie <= 0;    // nested interrupt is not supported.
-    end 
-    else if(ecall_exception)begin
-      csr_reg.mcause.exception_code <= (csr_reg.mstatus.mpp == MACHINE_MODE) ? ECALL_ENVIROMENT_FROM_M : 
-                                       (csr_reg.mstatus.mpp == USER_MODE) ? ECALL_ENVIROMENT_FROM_U : ECALL_ENVIROMENT_FROM_S;
-      mpp_prev <= csr_reg.mstatus.mpp;
-      csr_reg.mstatus.mpp <= MACHINE_MODE;
-      csr_reg.mepc <= pc;
-      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-      csr_reg.mstatus.mie <= 0;    // interrupt is not supported when exception.
-    end 
-    else if(rise_timer_interrupt) begin  
-      if(csr_reg.mtvec.mode == 0) csr_reg.mcause.exception_code <= MACHINE_TIMER_INTERRUPT;
-      mpp_prev <= csr_reg.mstatus.mpp;
-      csr_reg.mstatus.mpp <= MACHINE_MODE;
-      csr_reg.mcause.interrupt <= 1;
-      csr_reg.mepc <= pc;
-      csr_reg.mstatus.mpie <= csr_reg.mstatus.mie; 
-      csr_reg.mstatus.mie <= 0;    // interrupt is not supported when exception.
+      curr_cpu_mode <= MACHINE_MODE; // machine mode
+    end else if(is_exception)begin
+        curr_cpu_mode                 <= MACHINE_MODE;
+        csr_reg.mstatus.mpp           <= curr_cpu_mode;
+        csr_reg.mstatus.mie           <= 0;    // interrupt is not supported when exception.
+        csr_reg.mstatus.mpie          <= csr_reg.mstatus.mie; 
+        csr_reg.mcause.interrupt      <= 0;
+        csr_reg.mepc                  <= pc;
+        csr_reg.mtval                 <= inst;
+        csr_reg.mcause.exception_code <= exception_type;
+    end
+    else if(raise_timer_interrupt) begin  
+      curr_cpu_mode                   <= MACHINE_MODE;
+      csr_reg.mstatus.mpp             <= curr_cpu_mode;
+      csr_reg.mstatus.mie             <= 0;   // nested interrupt is not supported.
+      csr_reg.mstatus.mpie            <= csr_reg.mstatus.mie; 
+      csr_reg.mcause.interrupt        <= 1;
+      if(csr_reg.mtvec.mode == 0)  csr_reg.mcause.exception_code <= MACHINE_TIMER_INTERRUPT;
+      csr_reg.mepc                    <= pc;  
+      csr_reg.mip.mtip                <= 1;    
     end 
     else if(is_mret)begin
-      csr_reg.mstatus.mpp <= mpp_prev; 
-      csr_reg.mstatus.mie <= csr_reg.mstatus.mpie;
+      curr_cpu_mode        <= csr_reg.mstatus.mpp; 
+      csr_reg.mstatus.mie  <= csr_reg.mstatus.mpie;
       csr_reg.mstatus.mpie <= 1;  // enable insterrupt again
+      csr_reg.mcause       <= 0;
+      csr_reg.mtval        <= 0;
+      csr_reg.mip.mtip     <= 0;
     end 
     else if(is_csr)begin
       case(1'b1)
