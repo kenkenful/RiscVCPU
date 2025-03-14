@@ -49,11 +49,26 @@ parameter MTVAL_ADDR     = 12'h343;
 parameter MIP_ADDR       = 12'h344;
 
 parameter PMPCFG0        = 12'h3A0;
+parameter PMPCFG1        = 12'h3A1;
+parameter PMPCFG2        = 12'h3A2;
+parameter PMPCFG3        = 12'h3A3;
 
 parameter PMPADDR0       = 12'h3B0;
 parameter PMPADDR1       = 12'h3B1;
 parameter PMPADDR2       = 12'h3B2;
 parameter PMPADDR3       = 12'h3B3;
+parameter PMPADDR4       = 12'h3B4;
+parameter PMPADDR5       = 12'h3B5;
+parameter PMPADDR6       = 12'h3B6;
+parameter PMPADDR7       = 12'h3B7;
+parameter PMPADDR8       = 12'h3B8;
+parameter PMPADDR9       = 12'h3B9;
+parameter PMPADDR10      = 12'h3B10;
+parameter PMPADDR11      = 12'h3B11;
+parameter PMPADDR12      = 12'h3B12;
+parameter PMPADDR13      = 12'h3B13;
+parameter PMPADDR14      = 12'h3B14;
+parameter PMPADDR15      = 12'h3B15;
 
 parameter MVENDORID_ADDR = 12'hF11;
 parameter MARCHID_ADDR   = 12'hF12;
@@ -110,6 +125,13 @@ typedef struct packed{
 } mie_t;
 
 typedef struct packed{
+  bit [7:0] pmp3cfg;
+  bit [7:0] pmp2cfg;
+  bit [7:0] pmp1cfg;
+  bit [7:0] pmp0cfg;
+}pmpcfg;
+
+typedef struct packed{
   bit [19:0] reserve6; 
   bit meip;
   bit reserve5;
@@ -126,11 +148,28 @@ typedef struct packed{
 } mip_t;
 
 typedef struct packed{
-  bit[31:0]  pmpaddr3;
-  bit[31:0]  pmpaddr2;
-  bit[31:0]  pmpaddr1;
-  bit[31:0]  pmpaddr0;
-  bit[31:0]  pmpcfg0;     // pmp3cfg/pmp2cfg/pmp1cfg/pmp0cfg
+  bit[31:0] pmpcfg0;  // pmp3cfg/pmp2cfg/pmp1cfg/pmp0cfg
+  bit[31:0] pmpcfg1; 
+  bit[31:0] pmpcfg2;  
+  bit[31:0] pmpcfg3;  
+
+  bit[31:0] pmpaddr0; 
+  bit[31:0] pmpaddr1; 
+  bit[31:0] pmpaddr2; 
+  bit[31:0] pmpaddr3; 
+  bit[31:0] pmpaddr4; 
+  bit[31:0] pmpaddr5; 
+  bit[31:0] pmpaddr6; 
+  bit[31:0] pmpaddr7; 
+  bit[31:0] pmpaddr8; 
+  bit[31:0] pmpaddr9; 
+  bit[31:0] pmpaddr10;
+  bit[31:0] pmpaddr11;
+  bit[31:0] pmpaddr12;
+  bit[31:0] pmpaddr13;
+  bit[31:0] pmpaddr14;
+  bit[31:0] pmpaddr15;
+
   mstatus_t  mstatus;
   mie_t      mie;
   mtvec_t    mtvec;
