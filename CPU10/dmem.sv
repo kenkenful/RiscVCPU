@@ -1,4 +1,6 @@
 `default_nettype none
+`include "define.sv"
+
 
 module dmem(
     clk,
@@ -15,13 +17,9 @@ module dmem(
     input wire [31:0] mem_addr;
     input wire [31:0] store_data;
     output reg [31:0] load_data;
-    
-       // Distributed RAM
-    localparam data_width = 32;
-    localparam addr_width = 15;
-         
+             
     // Block RAM
-    (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  // data melmory
+    (* ram_style = "block" *)reg [data_width-1:0] mem [2**total_addr_width-1: 2**inst_addr_width];  // data melmory
     
     initial begin 
         integer i = 0;
