@@ -25,7 +25,7 @@ int main() {
     *mtime = 100;
     SetTrapVectors((unsigned long)trap_vectors + MTVEC_VECTORED_MODE);
 
-    *mtimecmp = *mtime + 10000;
+    *mtimecmp = *mtime + 500;
     EnableTimer();
     EnableInt();
 
@@ -56,6 +56,7 @@ int fib(int n) {
 
 int Timer(void)
 {
-    *mtimecmp = *mtimecmp + 10000;
-    return fib(10);;
+
+    *mtimecmp = *mtimecmp + 200;
+    return fib(10);
 }

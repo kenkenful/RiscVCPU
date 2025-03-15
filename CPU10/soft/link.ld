@@ -3,8 +3,8 @@ OUTPUT_ARCH("riscv")
 
 ENTRY(_start);
 MEMORY {
-  ROM(rxai) : ORIGIN = 0x0000, LENGTH = 2k
-  RAM(wa) : ORIGIN = 0x800, LENGTH = 10k
+  ROM(rxai) : ORIGIN = 0x0000, LENGTH = 16k
+  RAM(wa) : ORIGIN = 0x4000, LENGTH = 128k
 }
 
 SECTIONS
