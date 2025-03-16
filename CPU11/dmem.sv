@@ -38,6 +38,7 @@ module dmem(
     // store
     always_ff@(posedge clk)begin
         if(is_store) mem[mem_addr] <= store_data;
+        
     end
-    
+
 endmodule

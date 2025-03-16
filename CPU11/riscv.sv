@@ -36,7 +36,7 @@ module riscv(
   wire [31:0] timer_int_addr = (csr_reg.mtvec.mode == VECTOR_MODE) ? {csr_reg.mtvec.base_addr, 2'b00} + 28 : {csr_reg.mtvec.base_addr, 2'b00};
   wire [31:0] exception_addr = {csr_reg.mtvec.base_addr, 2'b00};
   wire [31:0] pc_plus = pc + 4;    
-  reg [31:0] next_pc;
+  reg  [31:0] next_pc;
 
   always_comb begin
     if(is_exception)               next_pc = exception_addr;
@@ -56,7 +56,6 @@ module riscv(
   wire [31:0] inst;
   reg [31:0] pc_de;
   reg [31:0] pc_plus_de;
-
 
   // fetch 
   imem imem0(
@@ -176,9 +175,9 @@ module riscv(
   wire i_sc      = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b00011);
   wire i_lr      = (opcode == 7'b0101111) & (funct3 == 3'b010) & (rs3 == 5'b00010);
 
-  reg    [31:0] regfile [1:31];                  // regfile[0] is zero register.  
-  wire   [31:0] a = (rs1==0) ? 0 : regfile[rs1]; // index 0 is zero register, so return 0. 
-  wire   [31:0] b = (rs2==0) ? 0 : regfile[rs2]; // index 0 is zero register, so return 0.
+  reg  [31:0] regfile [1:31];                  // regfile[0] is zero register.  
+  wire [31:0] a = (rs1==0) ? 0 : regfile[rs1]; // index 0 is zero register, so return 0. 
+  wire [31:0] b = (rs2==0) ? 0 : regfile[rs2]; // index 0 is zero register, so return 0.
   
   // execute
   reg [31:0] store_data;
@@ -199,7 +198,7 @@ module riscv(
 
   always_comb begin        
     alu_out        = 0;         
-    mem_addr      = 0;   
+    mem_addr       = 0;   
     is_write_back  = 0;   
     wmem           = 0;            
     rmem           = 0;
@@ -217,16 +216,16 @@ module riscv(
     is_exception   = 0;
     exception_code = NOT_DEFINED;
 
-    if(pc[1:0] != 0)begin
+    if(pc_de[1:0] != 0)begin
       is_exception = 1;
       exception_code = (ex_order(INSTRUCTION_ADDR_MISSALIGN) > ex_order(exception_code)) ? INSTRUCTION_ADDR_MISSALIGN : exception_code;
     end 
     else if(raise_timer_interrupt)begin
-      is_store = 0;
-      is_csr = 0;
-      is_atomic = 0;
+      is_load       = 0;
+      is_store      = 0;
+      is_csr        = 0;
+      is_atomic     = 0;
       is_write_back = 0;
-    
     end 
     else begin
       case (1'b1)
@@ -239,14 +238,17 @@ module riscv(
           alu_out = a - b;
           is_write_back = 1;                 
         end
+
         i_and: begin                                   
           alu_out = a & b;
           is_write_back = 1;                  
-        end     
+        end
+
         i_or: begin                                    
           alu_out = a | b;
           is_write_back = 1; 
         end
+
         i_xor: begin                                   
           alu_out = a ^ b;
           is_write_back = 1;   
@@ -256,51 +258,64 @@ module riscv(
           alu_out = a << b[4:0];
           is_write_back = 1; 
         end
+
         i_srl: begin                                   
           alu_out = a >> b[4:0];
           is_write_back = 1; 
         end
+
         i_sra: begin                                   
           alu_out = $signed(a) >>> b[4:0];
           is_write_back = 1; 
         end
+
         i_slli: begin                                  
           alu_out = a << shamt;
           is_write_back = 1; 
         end
+
         i_srli: begin                                  
           alu_out = a >> shamt;
           is_write_back = 1; 
         end
+
         i_srai: begin                                  
           alu_out = $signed(a) >>> shamt;
           is_write_back = 1; 
         end
+
         i_slt: begin                                   
           if ($signed(a) < $signed(b)) alu_out = 1; 
         end
+
         i_sltu: begin                                  
           if ({1'b0,a} < {1'b0,b}) alu_out = 1; 
         end
+
         i_addi: begin                                  
           alu_out = a + simm;
           is_write_back = 1; 
         end
+
         i_andi: begin                                  
           alu_out = a & simm;
           is_write_back = 1; 
         end
+
         i_ori: begin                                   
           alu_out = a | simm;
           is_write_back = 1; 
         end
+
         i_xori: begin                                  
           alu_out = a ^ simm;
           is_write_back = 1; 
         end
+
         i_slti: begin                                  
           if ($signed(a) < $signed(simm)) alu_out = 1; 
         end
+
         i_sltiu: begin                                 
           if ({1'b0,a} < {1'b0,simm}) 
             alu_out = 1; 
@@ -332,6 +347,7 @@ module riscv(
           is_write_back = 1;
           is_load = 1;                     
         end
+
         i_lb: begin                                     // load 1byte
           alu_out = a + simm;                         
           mem_addr  = {2'b0, alu_out[31:2]};
@@ -581,11 +597,11 @@ module riscv(
           
         i_amomax: store_data = ($signed(mem_out) > $signed(b)) ? mem_out : b;
         
-        i_amomaxu: store_data = (mem_out > b) ? mem_out : b;
+        i_amomaxu: store_data = ({1'b0, mem_out} > {1'b0, b}) ? mem_out : b;
         
         i_amomin: store_data = ($signed(mem_out) > $signed(b)) ? b : mem_out;
         
-        i_amominu: store_data = (mem_out > b) ? b : mem_out;
+        i_amominu: store_data = ({1'b0, mem_out} > {1'b0, b}) ? b : mem_out;
         
         i_amomor: store_data = mem_out | b;
           
@@ -602,6 +618,7 @@ module riscv(
           else if(curr_cpu_mode == USER_MODE) 
             exception_code = (ex_order(ECALL_ENVIROMENT_FROM_U) > ex_order(exception_code)) ? ECALL_ENVIROMENT_FROM_U : exception_code;
         end
+
         i_ebreak:begin
           is_exception = 1;
           exception_code = (ex_order(BREAKPOINT) > ex_order(exception_code)) ? BREAKPOINT : exception_code;
@@ -657,14 +674,13 @@ module riscv(
   reg [63:0] mtimecmp = 0;
   reg [31:0] reservation_reg = 0;   // for sc/lr operation
 
-
   // store
   always_ff@(posedge clk)begin
     if(reset)begin
       mtime <= 0;
     end else begin
       if(is_store && alu_out == MTIME_ADDR) mtime <= store_data; 
-      else if(!(is_store && alu_out == MTIME_ADDR) && csr_reg.mie.mtie) mtime <= mtime + 1;
+      else if(!(is_store && alu_out == MTIME_ADDR) && csr_reg.mie.mtie && !csr_reg.mip.mtip) mtime <= mtime + 1;
     end
   end
 
@@ -690,19 +706,20 @@ module riscv(
         csr_reg.mstatus.mie           <= 0;    // interrupt is not supported when exception.
         csr_reg.mstatus.mpie          <= csr_reg.mstatus.mie; 
         csr_reg.mcause.interrupt      <= 0;
+        csr_reg.mcause.exception_code <= exception_code;
         csr_reg.mepc                  <= pc_de;
         csr_reg.mtval                 <= inst;
-        csr_reg.mcause.exception_code <= exception_code;
     end
     else if(raise_timer_interrupt) begin  
-      curr_cpu_mode                   <= MACHINE_MODE;
-      csr_reg.mstatus.mpp             <= curr_cpu_mode;
-      csr_reg.mstatus.mie             <= 0;   // nested interrupt is not supported.
-      csr_reg.mstatus.mpie            <= csr_reg.mstatus.mie; 
-      csr_reg.mcause.interrupt        <= 1;
-      if(csr_reg.mtvec.mode == 0)  csr_reg.mcause.exception_code <= MACHINE_TIMER_INTERRUPT;
-      csr_reg.mepc                    <= pc_de;  
-      csr_reg.mip.mtip                <= 1;    
+      curr_cpu_mode            <= MACHINE_MODE;
+      csr_reg.mstatus.mpp      <= curr_cpu_mode;
+      csr_reg.mstatus.mie      <= 0;   // nested interrupt is not supported.
+      csr_reg.mstatus.mpie     <= csr_reg.mstatus.mie; 
+      csr_reg.mcause.interrupt <= 1;
+      if(csr_reg.mtvec.mode == 0) csr_reg.mcause.exception_code <= MACHINE_TIMER_INTERRUPT;
+      csr_reg.mepc             <= pc_de;
+      csr_reg.mtval            <= 0; 
+      csr_reg.mip.mtip         <= 1;    
     end 
     else if(is_mret)begin 
       curr_cpu_mode        <= csr_reg.mstatus.mpp; 
@@ -759,6 +776,7 @@ module riscv(
             MCAUSE_ADDR:  csr_reg.mcause    <= csr_reg.mcause    | a;
             MTVAL_ADDR:   csr_reg.mtval     <= csr_reg.mtval     | a;
             MIP_ADDR:     csr_reg.mip       <= csr_reg.mip       | a;
+
             PMPCFG0:      csr_reg.pmpcfg0   <= csr_reg.pmpcfg0   | a;
             PMPCFG1:      csr_reg.pmpcfg1   <= csr_reg.pmpcfg1   | a;
             PMPCFG2:      csr_reg.pmpcfg2   <= csr_reg.pmpcfg2   | a;
@@ -994,7 +1012,7 @@ module riscv(
         i_lr:begin
           reservation_reg <= a;
           if(rd != 0) regfile[rd] <= mem_out;
-        end                           // x[rs1]
+        end                          // x[rs1]
         default:;
       endcase
     end

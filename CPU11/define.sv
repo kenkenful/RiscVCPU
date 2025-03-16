@@ -3,8 +3,8 @@
 
 // Instruction and data memory
 parameter data_width = 32;
-parameter inst_addr_width = 12;   // 4k * 4 bytes
-parameter total_addr_width = 15;  // 32k * 4bytes
+parameter inst_addr_width = 12;   // 4k * 4 bytes = 16k
+parameter total_addr_width = 15;  // 32k * 4bytes = 128k
 
 // CPU mode
 parameter USER_MODE       = 2'b00;
