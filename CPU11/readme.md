@@ -1,11 +1,8 @@
 CPU4をベースにcsrとアトミック命令、タイマー割り込みを追加しました。</br>
-割り込みが入ったときに、現在実行している命令を捨てるため、ロード、ストア、ライトバックをキャンセルしています。
+割り込みから復帰するアドレスは、jumpのときはjump先のアドレスにするようにします。
+
 ```
-    if(raise_timer_interrupt)begin
-      is_store = 0;
-      is_csr = 0;
-      is_atomic = 0;
-      is_write_back = 0;
+     csr_reg.mepc             <= is_jump ? jump_addr : pc;
 ```
 
 また、csrとアトミック命令をサポートするため、ビルド時のオプションを変更しています。
