@@ -25,12 +25,15 @@ int main() {
     *mtime = 100;
     SetTrapVectors((unsigned long)trap_vectors + MTVEC_VECTORED_MODE);
 
-    *mtimecmp = *mtime + 500;
+    *mtimecmp = *mtime + 1000;
     EnableTimer();
     EnableInt();
 
-    int ans = fib(10);
+    fib(10);    
+ 
+    DisableInt();
 
+    //fib(15);
    // uint32_t value;
    // __asm__ __volatile__("csrr %0, mtime" : "=r"(value));
    // __asm__ __volatile__("csrr %0, mtimecmp" : "=r"(value));
@@ -42,7 +45,7 @@ int main() {
     //volatile unsigned char num = *(volatile unsigned char*)0x100;
     //*(volatile unsigned char*)(0x20020) = (unsigned char)num;
     //for(;;) {}
-    return 0;
+    return 0xff;
 }   
 
 int add(int a, int b){
@@ -56,7 +59,7 @@ int fib(int n) {
 
 int Timer(void)
 {
+    *mtimecmp = *mtime + 379;
+    return fib(3);    
 
-    *mtimecmp = *mtimecmp + 200;
-    return fib(10);
 }
