@@ -252,5 +252,4 @@ typedef struct packed{
     reg i_amoxor;  
 }de_ex_pipeline_reg;
 
-
 `endif

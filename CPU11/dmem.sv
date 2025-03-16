@@ -1,7 +1,6 @@
 `default_nettype none
 `include "define.sv"
 
-
 module dmem(
     clk,
     is_store,

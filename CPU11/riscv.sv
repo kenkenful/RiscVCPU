@@ -220,13 +220,13 @@ module riscv(
       is_exception = 1;
       exception_code = (ex_order(INSTRUCTION_ADDR_MISSALIGN) > ex_order(exception_code)) ? INSTRUCTION_ADDR_MISSALIGN : exception_code;
     end 
-    else if(raise_timer_interrupt)begin
-      is_load       = 0;
-      is_store      = 0;
-      is_csr        = 0;
-      is_atomic     = 0;
-      is_write_back = 0;
-    end 
+    //else if(raise_timer_interrupt)begin
+    //  is_load       = 0;
+    //  is_store      = 0;
+    //  is_csr        = 0;
+    //  is_atomic     = 0;
+    //  is_write_back = 0;
+    //end 
     else begin
       case (1'b1)
         i_add: begin                                   
@@ -707,7 +707,7 @@ module riscv(
         csr_reg.mstatus.mpie          <= csr_reg.mstatus.mie; 
         csr_reg.mcause.interrupt      <= 0;
         csr_reg.mcause.exception_code <= exception_code;
-        csr_reg.mepc                  <= pc_de;
+        csr_reg.mepc                  <= is_jump ? jump_addr : pc;
         csr_reg.mtval                 <= inst;
     end
     else if(raise_timer_interrupt) begin  
@@ -717,7 +717,7 @@ module riscv(
       csr_reg.mstatus.mpie     <= csr_reg.mstatus.mie; 
       csr_reg.mcause.interrupt <= 1;
       if(csr_reg.mtvec.mode == 0) csr_reg.mcause.exception_code <= MACHINE_TIMER_INTERRUPT;
-      csr_reg.mepc             <= pc_de;
+      csr_reg.mepc             <= is_jump ? jump_addr : pc;
       csr_reg.mtval            <= 0; 
       csr_reg.mip.mtip         <= 1;    
     end 
