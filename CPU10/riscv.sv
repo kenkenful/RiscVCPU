@@ -28,25 +28,6 @@ module riscv(
   end
   endfunction
 
-  // Distributed RAM
-  localparam data_width = 32;
-  localparam addr_width = 11;
-   
-  reg [data_width-1:0] mem [2**addr_width-1:0];  // instruction and data melmory
-  
-  initial begin 
-      integer i = 0;
-      //csr_reg_t test;
-      //test.mtvec = 32'h03300001; 
-      //$display("base =%x, mode=%d\n", test.mtvec.base_addr, test.mtvec.mode);  
-      //test.mstatus = 32'h0000000f; 
-      //$display("sd=%d, wpri4=%d, s=%d, u=%d\n", test.mstatus.sd, test.mstatus.wpri4 , test.mstatus.sie, test.mstatus.uie);  
-      $readmemh("/home/ttt/Desktop/riscv/RISCV/RISCV.srcs/sources_1/new/soft/test.hex", mem);
-      
-      for(i=0; i<100; i=i+1) $display( "%x: %x",i*4, mem[i]);
-      
-  end
-  
   reg [31:0] pc;             
   reg [31:0] jump_addr;
   reg is_jump;     
@@ -70,14 +51,19 @@ module riscv(
   
   // fetch
   wire [31:0] inst;
-
-  // fetch 
-  imem imem0(
+  wire [31:0] mem_out;
+  
+  // fetch, store/load
+  mem mem0(
       .clk(clk),
       .pc(pc),
-      .inst(inst)
+      .inst(inst),
+      .is_store(is_store | is_atomic),
+      .is_load(is_load | is_atomic),
+      .mem_addr(mem_addr),
+      .store_data(store_data),
+      .load_data(mem_out)
   );
-
 
   // decode
   wire [6:0]  opcode = inst[6:0];  
@@ -91,13 +77,13 @@ module riscv(
   wire        sign   = inst[31];
   wire [11:0] imm    = inst[31:20];
 
-  wire   [31:0] broffset  = {{19{sign}},inst[31],inst[7],inst[30:25],inst[11:8],1'b0};       
-  wire   [31:0] simm      = {{20{sign}},inst[31:20]};                                     
-  wire   [31:0] stimm     = {{20{sign}},inst[31:25],inst[11:7]};                         
-  wire   [31:0] uimm      = {inst[31:12],12'h0};                                         
-  wire   [31:0] jaloffset = {{11{sign}},inst[31],inst[19:12],inst[20],inst[30:21],1'b0}; 
-  wire   [11:0] csr       = inst[31:20];
-  wire   [31:0] zimm      = {27'h0, inst[19:15]};
+  wire [31:0] broffset  = {{19{sign}},inst[31],inst[7],inst[30:25],inst[11:8],1'b0};       
+  wire [31:0] simm      = {{20{sign}},inst[31:20]};                                     
+  wire [31:0] stimm     = {{20{sign}},inst[31:25],inst[11:7]};                         
+  wire [31:0] uimm      = {inst[31:12],12'h0};                                         
+  wire [31:0] jaloffset = {{11{sign}},inst[31],inst[19:12],inst[20],inst[30:21],1'b0}; 
+  wire [11:0] csr       = inst[31:20];
+  wire [31:0] zimm      = {27'h0, inst[19:15]};
 
   wire i_auipc = (opcode == 7'b0010111);
   wire i_lui   = (opcode == 7'b0110111);
@@ -216,15 +202,13 @@ module riscv(
     if(pc[1:0] != 0)begin
       is_exception = 1;
       exception_code = (ex_order(INSTRUCTION_ADDR_MISSALIGN) > ex_order(exception_code)) ? INSTRUCTION_ADDR_MISSALIGN : exception_code;
-
-    end else
-    if(raise_timer_interrupt)begin
-      is_store = 0;
-      is_csr = 0;
-      is_atomic = 0;
-      is_write_back = 0;
+    //end else
+    //if(raise_timer_interrupt)begin
+    //  is_store = 0;
+    //  is_csr = 0;
+    //  is_atomic = 0;
+    //  is_write_back = 0;
     end else begin
-
       case (1'b1)
         i_add: begin                                   
           alu_out = a + b;
@@ -235,14 +219,17 @@ module riscv(
           alu_out = a - b;
           is_write_back = 1;                 
         end
+
         i_and: begin                                   
           alu_out = a & b;
           is_write_back = 1;                  
-        end     
+        end   
+
         i_or: begin                                    
           alu_out = a | b;
           is_write_back = 1; 
         end
+
         i_xor: begin                                   
           alu_out = a ^ b;
           is_write_back = 1;   
@@ -252,55 +239,69 @@ module riscv(
           alu_out = a << b[4:0];
           is_write_back = 1; 
         end
+
         i_srl: begin                                   
           alu_out = a >> b[4:0];
           is_write_back = 1; 
         end
+
         i_sra: begin                                   
           alu_out = $signed(a) >>> b[4:0];
           is_write_back = 1; 
         end
+
         i_slli: begin                                  
           alu_out = a << shamt;
           is_write_back = 1; 
         end
+
         i_srli: begin                                  
           alu_out = a >> shamt;
           is_write_back = 1; 
         end
+
         i_srai: begin                                  
           alu_out = $signed(a) >>> shamt;
           is_write_back = 1; 
         end
+
         i_slt: begin                                   
           if ($signed(a) < $signed(b)) alu_out = 1; 
         end
+
         i_sltu: begin                                  
           if ({1'b0,a} < {1'b0,b}) alu_out = 1; 
         end
+
         i_addi: begin                                  
           alu_out = a + simm;
           is_write_back = 1; 
         end
+
         i_andi: begin                                  
           alu_out = a & simm;
           is_write_back = 1; 
         end
+
         i_ori: begin                                   
           alu_out = a | simm;
           is_write_back = 1; 
         end
+
         i_xori: begin                                  
           alu_out = a ^ simm;
           is_write_back = 1; 
         end
+
         i_slti: begin                                  
           if ($signed(a) < $signed(simm)) alu_out = 1; 
         end
+
         i_sltiu: begin                                 
           if ({1'b0,a} < {1'b0,simm}) 
             alu_out = 1; 
         end
+
         i_lw: begin                                    // load 4bytes
           alu_out = a + simm;                        
           mem_addr  = {2'b0, alu_out[31:2]};
@@ -318,7 +319,8 @@ module riscv(
             is_exception = 1;
             exception_code = (ex_order(LOAD_ACCESS_FAULT) > ex_order(exception_code)) ? LOAD_ACCESS_FAULT : exception_code;
           end          
-        end       
+        end    
+
         i_lbu: begin                                   // load 1byte unsigned
           alu_out = a + simm;                        
           mem_addr  = {2'b0, alu_out[31:2]};              
@@ -326,6 +328,7 @@ module riscv(
           is_write_back = 1;
           is_load = 1;                     
         end
+
         i_lb: begin                                     // load 1byte
           alu_out = a + simm;                         
           mem_addr  = {2'b0, alu_out[31:2]};
@@ -333,6 +336,7 @@ module riscv(
           is_write_back = 1; 
           is_load = 1;                   
         end
+        
         i_lhu: begin                                    // load 2bytes unsigned
           alu_out = a + simm;                         
           mem_addr  = {2'b0, alu_out[31:2]};
@@ -351,6 +355,7 @@ module riscv(
             exception_code = (ex_order(LOAD_ACCESS_FAULT) > ex_order(exception_code)) ? LOAD_ACCESS_FAULT : exception_code;
           end
         end
+
         i_lh: begin                                     // load 2bytes 
           alu_out = a + simm;                         
           mem_addr  = {2'b0, alu_out[31:2]};
@@ -369,6 +374,7 @@ module riscv(
             exception_code = (ex_order(LOAD_ACCESS_FAULT) > ex_order(exception_code)) ? LOAD_ACCESS_FAULT : exception_code;
           end         
         end
+
         i_sb: begin                                    // 1 byte store
           alu_out = a + stimm;
           mem_addr  = {2'b0, alu_out[31:2]};
@@ -388,6 +394,7 @@ module riscv(
             uart_tx_data = store_data[7:0];
           end
         end
+
         i_sh: begin                                    // 2 bytes store
           alu_out = a + stimm;
           mem_addr  = {2'b0, alu_out[31:2]};
@@ -409,6 +416,7 @@ module riscv(
             exception_code = (ex_order(STORE_AMO_ACCESS_FAULT) > ex_order(exception_code)) ? STORE_AMO_ACCESS_FAULT : exception_code;
           end 
         end
+
         i_sw: begin                                    // 4 bytes store
           alu_out = a + stimm;
           mem_addr  = {2'b0, alu_out[31:2]};
@@ -424,6 +432,7 @@ module riscv(
             exception_code = (ex_order(STORE_AMO_ACCESS_FAULT) > ex_order(exception_code)) ? STORE_AMO_ACCESS_FAULT : exception_code;
           end
         end
+
         i_beq: begin                                   
           if (a == b) begin
             alu_out = 1;
@@ -431,6 +440,7 @@ module riscv(
             jump_addr = pc + broffset; 
           end
         end
+
         i_bne: begin                                   
           if (a != b)begin
             alu_out = 1;
@@ -438,6 +448,7 @@ module riscv(
             jump_addr = pc + broffset; 
           end
         end
+
         i_blt: begin                                   
           if ($signed(a) < $signed(b))begin
             alu_out = 1;
@@ -445,6 +456,7 @@ module riscv(
             jump_addr = pc + broffset; 
           end
         end
+
         i_bge: begin                                   
           if ($signed(a) >= $signed(b))begin
             alu_out = 1;
@@ -452,6 +464,7 @@ module riscv(
             jump_addr = pc + broffset; 
           end
         end
+
         i_bltu: begin                                  
           if ({1'b0,a} < {1'b0,b})begin
             alu_out = 1;
@@ -459,6 +472,7 @@ module riscv(
             jump_addr = pc + broffset;
           end
         end
+
         i_bgeu: begin                                  
           if ({1'b0,a} >= {1'b0,b})begin
             alu_out = 1;
@@ -466,6 +480,7 @@ module riscv(
             jump_addr = pc + broffset;
            end 
         end
+
         i_auipc: begin                                 
           alu_out = pc + uimm;
           is_write_back = 1; 
@@ -475,6 +490,7 @@ module riscv(
           alu_out = uimm;
           is_write_back = 1; 
         end
+
         i_jal: begin                                   
           alu_out = pc_plus;                       // set pc+4 to link register
           is_write_back = 1;
@@ -531,6 +547,7 @@ module riscv(
           alu_out = a % b;
           is_write_back = 1;
         end
+
         i_csrrw, i_csrrs, i_csrrc, i_csrrwi, i_csrrsi, i_csrrci:begin
           is_csr = 1;
           if(curr_cpu_mode != MACHINE_MODE)begin
@@ -539,17 +556,41 @@ module riscv(
             exception_code = (ex_order(ILLEGAL_INSTRUCTION) > ex_order(exception_code)) ? ILLEGAL_INSTRUCTION : exception_code;
           end
         end
+
         i_mret:begin
           is_mret = 1;
         end
+
         i_amoadd, i_amoand, i_amomax, i_amomaxu, i_amomin, i_amominu, i_amomor, i_amoswap, i_amoxor, i_sc, i_lr:begin
           is_atomic = 1;  
+          mem_addr = {2'b0, a[31:2]};
           if(a[1:0] != 2'b00)begin    // miss align
             is_atomic = 0;
             is_exception = 1;
             exception_code = (ex_order(STORE_AMO_ADDR_MISSALIGN) > ex_order(exception_code)) ? STORE_AMO_ADDR_MISSALIGN : exception_code;
           end 
         end
+                               //mem[x[rs1]]   x[rs2]
+        i_amoadd: store_data = mem_out + b;
+                               //mem[x[rs1]]   x[rs2]     
+        i_amoand: store_data = mem_out & b;
+          
+        i_amomax: store_data = ($signed(mem_out) > $signed(b)) ? mem_out : b;
+        
+        i_amomaxu: store_data = ({1'b0, mem_out} > {1'b0, b}) ? mem_out : b;
+        
+        i_amomin: store_data = ($signed(mem_out) > $signed(b)) ? b : mem_out;
+        
+        i_amominu: store_data = ({1'b0, mem_out} > {1'b0, b}) ? b : mem_out;
+        
+        i_amomor: store_data = mem_out | b;
+          
+        i_amoswap: store_data = b;
+       
+        i_amoxor: store_data = mem_out ^ b;
+        
+        i_sc: if(reservation_reg == a) store_data = b; 
+        
         i_ecall:begin
           is_exception = 1;
           if(curr_cpu_mode == MACHINE_MODE)
@@ -557,6 +598,7 @@ module riscv(
           else if(curr_cpu_mode == USER_MODE) 
             exception_code = (ex_order(ECALL_ENVIROMENT_FROM_U) > ex_order(exception_code)) ? ECALL_ENVIROMENT_FROM_U : exception_code;
         end
+
         i_ebreak:begin
           is_exception = 1;
           exception_code = (ex_order(BREAKPOINT) > ex_order(exception_code)) ? BREAKPOINT : exception_code;
@@ -565,20 +607,7 @@ module riscv(
         default:;
       endcase
     end
-
   end
-
-  wire [31:0] mem_out;
-
-  // store/load
-  dmem dmem0(
-      .clk(clk),
-      .is_store(is_store),
-      .is_load(is_load),
-      .mem_addr(mem_addr),
-      .store_data(store_data),
-      .load_data(mem_out)
-  );
 
   reg [31:0] load_data;
 
@@ -611,13 +640,14 @@ module riscv(
   reg [63:0] mtime = 0;
   reg [63:0] mtimecmp = 0;
   reg [31:0] reservation_reg = 0;   // for sc/lr operation
+
   // store
   always_ff@(posedge clk)begin
     if(reset)begin
       mtime <= 0;
     end else begin
       if(is_store && alu_out == MTIME_ADDR) mtime <= store_data; 
-      else if(!(is_store && alu_out == MTIME_ADDR) && csr_reg.mie.mtie) mtime <= mtime + 1;
+      else if(!(is_store && alu_out == MTIME_ADDR) && csr_reg.mie.mtie && !csr_reg.mip.mtip) mtime <= mtime + 1;
     end
   end
 
@@ -627,26 +657,6 @@ module riscv(
     else begin
       if(is_store && alu_out == MTIMECMP_ADDR) mtimecmp <= store_data;
     end  
-  end
-
-  always_ff@(posedge clk)begin
-    if(is_store && alu_out < MEMMAP_BASE_ADDR)  
-      mem[mem_addr] <= store_data;
-    else if(is_atomic)begin
-      case(1'b1)
-        i_amoadd:  mem[a] <= mem[a] + b;    
-        i_amoand:  mem[a] <= mem[a] & b;
-        i_amomax:  mem[a] <= ($signed(mem[a]) > $signed(b)) ? mem[a] : mem[b];
-        i_amomaxu: mem[a] <= (a > b) ? mem[a] : mem[b];
-        i_amomin:  mem[a] <= ($signed(mem[a]) > $signed(b)) ? mem[b] : mem[a];
-        i_amominu: mem[a] <= (a > b) ? mem[b] : mem[a];
-        i_amomor:  mem[a] <= mem[a] | b;
-        i_amoswap: mem[a] <= b;
-        i_amoxor:  mem[a] <= mem[a] ^ b;
-        i_sc: if(reservation_reg == a) mem[a] <= b;            
-        default:;
-      endcase
-    end
   end
 
   // csr register
@@ -663,7 +673,7 @@ module riscv(
         csr_reg.mstatus.mie           <= 0;    // interrupt is not supported when exception.
         csr_reg.mstatus.mpie          <= csr_reg.mstatus.mie; 
         csr_reg.mcause.interrupt      <= 0;
-        csr_reg.mepc                  <= pc;
+        csr_reg.mepc                  <= is_jump ? jump_addr : pc_plus;  
         csr_reg.mtval                 <= inst;
         csr_reg.mcause.exception_code <= exception_code;
     end
@@ -674,7 +684,7 @@ module riscv(
       csr_reg.mstatus.mpie            <= csr_reg.mstatus.mie; 
       csr_reg.mcause.interrupt        <= 1;
       if(csr_reg.mtvec.mode == 0)  csr_reg.mcause.exception_code <= MACHINE_TIMER_INTERRUPT;
-      csr_reg.mepc                    <= pc;  
+      csr_reg.mepc                    <= is_jump ? jump_addr : pc_plus;
       csr_reg.mip.mtip                <= 1;    
     end 
     else if(is_mret)begin
@@ -952,21 +962,22 @@ module riscv(
         PMPADDR14:    if(rd != 0) regfile[rd] <= csr_reg.pmpaddr14;
         PMPADDR15:    if(rd != 0) regfile[rd] <= csr_reg.pmpaddr15;
         default:;
-      endcase        
-    end else if(is_atomic)begin
+      endcase
+    end        
+    else if(is_atomic)begin
       case(1'b1)
         i_amoadd, i_amoand, i_amomax, i_amomaxu, i_amomin, i_amominu, i_amomor, i_amoswap, i_amoxor:  
-          if(rd != 0) regfile[rd] <= mem[a]; 
-        i_sc:begin
+          if(rd != 0) regfile[rd] <= mem_out; 
+        i_sc:begin                   // x[rs1]
           if(reservation_reg == a)
             if(rd != 0) regfile[rd] <= 0;         
-          else 
+          else             // x[rd]
             if(rd != 0) regfile[rd] <= 1;       
         end
         i_lr:begin
           reservation_reg <= a;
-          if(rd != 0) regfile[rd] <= mem[a];
-        end
+          if(rd != 0) regfile[rd] <= mem_out;
+        end                          // x[rs1]
         default:;
       endcase
     end
