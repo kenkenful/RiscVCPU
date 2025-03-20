@@ -102,9 +102,9 @@ module riscv(
         shamt_de     = inst[24:20]; 
         jaloffset_de = {{11{sign}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0}; // jal
 
-        // forwarding 
-        a_de = (rs1_de == 0) ? 0 : (!is_load_mem & is_write_back_mem & (rd_mem == rs1_de)) ? alu_out_mem : (is_load_wb & (rd_wb == rs1_de)) ? load_data_wb : (is_write_back_wb & (rd_wb == rs1_de)) ? alu_out_wb : regfile[rs1_de]; 
-        b_de = (rs2_de == 0) ? 0 : (!is_load_mem & is_write_back_mem & (rd_mem == rs2_de)) ? alu_out_mem : (is_load_wb & (rd_wb == rs2_de)) ? load_data_wb : (is_write_back_wb & (rd_wb == rs2_de)) ? alu_out_wb : regfile[rs2_de];  
+        // forwarding
+        a_de = (rs1_de == 0) ? 0 : (!is_load_mem & is_write_back_mem & (rd_mem == rs1_de)) ? alu_out_mem : (is_write_back_wb & (rd_wb == rs1_de)) ? write_back_data : regfile[rs1_de]; 
+        b_de = (rs2_de == 0) ? 0 : (!is_load_mem & is_write_back_mem & (rd_mem == rs2_de)) ? alu_out_mem : (is_write_back_wb & (rd_wb == rs2_de)) ? write_back_data : regfile[rs2_de];  
 
         // stoll
         is_stoll = (is_load_ex & ((rd_ex == rs1_de) | (rd_ex == rs2_de)));
@@ -261,9 +261,9 @@ module riscv(
         is_jump = 0;
         store_data_ex = 0;
 
-        // forwarding 
-        a = (!is_load_mem & is_write_back_mem & (rd_mem == rs1_ex)) ? alu_out_mem : (is_load_wb & (rd_wb == rs1_ex)) ? load_data_wb : (is_write_back_wb & (rd_wb == rs1_ex)) ? alu_out_wb : a_ex;
-        b = (!is_load_mem & is_write_back_mem & (rd_mem == rs2_ex)) ? alu_out_mem : (is_load_wb & (rd_wb == rs2_ex)) ? load_data_wb : (is_write_back_wb & (rd_wb == rs2_ex)) ? alu_out_wb : b_ex;
+        // forwarding
+        a = (!is_load_mem & is_write_back_mem & (rd_mem == rs1_ex)) ? alu_out_mem : (is_write_back_wb & (rd_wb == rs1_ex)) ? write_back_data : a_ex;
+        b = (!is_load_mem & is_write_back_mem & (rd_mem == rs2_ex)) ? alu_out_mem : (is_write_back_wb & (rd_wb == rs2_ex)) ? write_back_data : b_ex;
         
         case (1'b1)
             ex.i_add: begin                                   
