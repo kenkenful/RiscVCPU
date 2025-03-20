@@ -102,12 +102,10 @@ module riscv(
         shamt_de     = inst[24:20]; 
         jaloffset_de = {{11{sign}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0}; // jal
 
-        // forwarding
-        a_de = (rs1_de == 0) ? 0 : (!is_load_mem & is_write_back_mem & (rd_mem == rs1_de)) ? alu_out_mem : (is_write_back_wb & (rd_wb == rs1_de)) ? write_back_data : regfile[rs1_de]; 
-        b_de = (rs2_de == 0) ? 0 : (!is_load_mem & is_write_back_mem & (rd_mem == rs2_de)) ? alu_out_mem : (is_write_back_wb & (rd_wb == rs2_de)) ? write_back_data : regfile[rs2_de];  
+        // forwarding 
+        a_de = (rs1_de == 0) ? 0 : (is_write_back_wb & (rd_wb == rs1_de)) ? write_back_data : regfile[rs1_de]; 
+        b_de = (rs2_de == 0) ? 0 : (is_write_back_wb & (rd_wb == rs2_de)) ? write_back_data : regfile[rs2_de];  
 
-        // stoll
-        is_stoll = (is_load_ex & ((rd_ex == rs1_de) | (rd_ex == rs2_de)));
 
         de.i_auipc  = (opcode == 7'b0010111);
         de.i_lui    = (opcode == 7'b0110111);
@@ -199,20 +197,20 @@ module riscv(
           pc_plus_ex   <= 0;
           ex           <= 0;
         end else if(is_stoll)begin
-          a_ex         <= 0;
-          b_ex         <= 0;
-          jaloffset_ex <= 0;
-          broffset_ex  <= 0;
-          shamt_ex     <= 0;
-          simm_ex      <= 0;
-          uimm_ex      <= 0;
-          stimm_ex     <= 0;
-          rd_ex        <= 0;
-          rs1_ex       <= 0;
-          rs2_ex       <= 0;
-          pc_ex        <= 0;
-          pc_plus_ex   <= 0;      
-          ex           <= 0;
+          a_ex         <= a_ex         ;
+          b_ex         <= b_ex         ;
+          jaloffset_ex <= jaloffset_ex ;
+          broffset_ex  <= broffset_ex  ;
+          shamt_ex     <= shamt_ex     ;
+          simm_ex      <= simm_ex      ;
+          uimm_ex      <= uimm_ex      ;
+          stimm_ex     <= stimm_ex     ;
+          rd_ex        <= rd_ex        ;
+          rs1_ex       <= rs1_ex       ;
+          rs2_ex       <= rs2_ex       ;
+          pc_ex        <= pc_ex        ;
+          pc_plus_ex   <= pc_plus_ex   ;      
+          ex           <= ex           ;
         end else begin
           a_ex         <= a_de        ;
           b_ex         <= b_de        ;
@@ -261,10 +259,13 @@ module riscv(
         is_jump = 0;
         store_data_ex = 0;
 
-        // forwarding
+        // forwarding 
         a = (!is_load_mem & is_write_back_mem & (rd_mem == rs1_ex)) ? alu_out_mem : (is_write_back_wb & (rd_wb == rs1_ex)) ? write_back_data : a_ex;
         b = (!is_load_mem & is_write_back_mem & (rd_mem == rs2_ex)) ? alu_out_mem : (is_write_back_wb & (rd_wb == rs2_ex)) ? write_back_data : b_ex;
         
+        // stoll
+        is_stoll = (is_load_mem & ((rd_mem == rs1_ex) | (rd_mem == rs2_ex)));
+
         case (1'b1)
             ex.i_add: begin                                   
               alu_out_ex = a + b;
@@ -576,14 +577,27 @@ module riscv(
 
     // execute/mem pipline
     always@(posedge clk)begin
-      is_store_mem      <= is_store_ex;
-      is_load_mem       <= is_load_ex;
-      rd_mem            <= rd_ex;
-      is_write_back_mem <= is_write_back_ex;
-      alu_out_mem       <= alu_out_ex;
-      rmem_mem          <= rmem_ex;
-      mem_addr_mem      <= mem_addr_ex;
-      store_data_mem    <= store_data_ex;
+      if(is_stoll)begin
+        is_store_mem      <= 0;
+        is_load_mem       <= 0;
+        rd_mem            <= 0;
+        is_write_back_mem <= 0;
+        alu_out_mem       <= 0;
+        rmem_mem          <= 0;
+        mem_addr_mem      <= 0;
+        store_data_mem    <= 0;
+        
+      end else begin
+        is_store_mem      <= is_store_ex;
+        is_load_mem       <= is_load_ex;
+        rd_mem            <= rd_ex;
+        is_write_back_mem <= is_write_back_ex;
+        alu_out_mem       <= alu_out_ex;
+        rmem_mem          <= rmem_ex;
+        mem_addr_mem      <= mem_addr_ex;
+        store_data_mem    <= store_data_ex;
+
+      end
     end
 
     reg is_write_back_wb;
