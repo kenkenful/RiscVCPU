@@ -1,8 +1,6 @@
 `default_nettype none
 `include "define.sv"
 
-`define UART_TX_ADDR 32'h20020
-
 module riscv(
       clk,
       reset,
@@ -41,12 +39,12 @@ module riscv(
 
     //FETCH/DECODE pipeline reg
     always_ff@(posedge clk)begin
-      if(is_jump)begin
-        pc_de <= 0;
-        pc_plus_de <= 0;
-      end else if(is_stoll)begin
+      if(is_stoll)begin
         pc_de <= pc_de;
         pc_plus_de <= pc_plus_de;
+      end else if(is_jump)begin
+        pc_de <= 0;
+        pc_plus_de <= 0;
       end else begin
         pc_de <= pc;
         pc_plus_de <= pc_plus;
@@ -392,7 +390,7 @@ module riscv(
                 default: store_data = 0;
               endcase
               
-              if(alu_out == `UART_TX_ADDR) begin
+              if(alu_out == UART_TX_ADDR) begin
                    uart_en = 1;
                    uart_tx_data = store_data[7:0];
               end
