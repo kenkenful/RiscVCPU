@@ -3,14 +3,16 @@
 
 module imem(
    clk,
-   is_flush,
+   is_interrupt,
+   is_jump,
    is_stoll,
     pc,
     inst
 );
     
     input wire clk;
-    input wire is_flush;
+    input wire is_interrupt;
+    input wire is_jump;
     input wire is_stoll;
     input wire [31:0] pc;
     output reg [31:0] inst;
@@ -28,13 +30,10 @@ module imem(
     end
 
     always_ff@(posedge clk)begin
-        if(is_flush)
-            inst <= 0;
-        else if(is_stoll)
-            inst <= inst;
-        else
-            inst <= mem[pc[31:2]];
-
+        if(is_interrupt)  inst <= 0;
+        else if(is_stoll) inst <= inst;
+        else if(is_jump)  inst <= 0;
+        else              inst <= mem[pc[31:2]];
     end
  
 endmodule

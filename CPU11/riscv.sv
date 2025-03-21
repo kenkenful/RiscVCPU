@@ -60,7 +60,8 @@ module riscv(
   // fetch 
   imem imem0(
       .clk(clk),
-      .is_flush(is_jump | raise_timer_interrupt),
+      .is_interrupt(raise_timer_interrupt),
+      .is_jump(is_jump),
       .is_stoll(is_stoll),
       .pc(pc),
       .inst(inst)   // FETCH/DECODE pipline      
@@ -68,12 +69,15 @@ module riscv(
 
   //FETCH/DECODE pipeline reg
   always_ff@(posedge clk)begin
-    if(is_jump | raise_timer_interrupt)begin
+    if(raise_timer_interrupt)begin
       pc_de <= 0;
       pc_plus_de <= 0;
     end else if(is_stoll)begin
       pc_de <= pc_de;
       pc_plus_de <= pc_plus_de;
+    end else if(is_jump)begin
+      pc_de <= 0;
+      pc_plus_de <= 0;
     end else begin
       pc_de <= pc;
       pc_plus_de <= pc_plus;
