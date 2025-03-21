@@ -24,7 +24,6 @@ module mem(
     input wire [31:0] store_data;
     output reg [31:0] load_data;
     
-    // Distributed RAM 
     localparam data_width = 32;
     localparam addr_width = 12; 
     
@@ -41,11 +40,11 @@ module mem(
     end
     
     always_ff@(posedge clk)begin
-      if(is_jump)
-          inst <= 0;
-      else if(is_stoll)
+      if(is_stoll)
           inst <= inst;
-      else
+      else if(is_jump)
+          inst <= 0;
+      else 
           inst <= mem[pc[31:2]];
     end
     

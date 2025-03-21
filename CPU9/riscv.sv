@@ -46,12 +46,12 @@ module riscv(
 
     //FETCH/DECODE pipeline reg
     always_ff@(posedge clk)begin
-      if(is_jump)begin
-        pc_de <= 0;
-        pc_plus_de <= 0;
-      end else if(is_stoll)begin
+      if(is_stoll)begin
         pc_de <= pc_de;
         pc_plus_de <= pc_plus_de;
+      end else if(is_jump)begin
+        pc_de <= 0;
+        pc_plus_de <= 0;
       end else begin
         pc_de <= pc;
         pc_plus_de <= pc_plus;
@@ -181,22 +181,7 @@ module riscv(
     reg [31:0] pc_plus_ex;
 
     always_ff@(posedge clk)begin
-        if(is_jump)begin
-          a_ex         <= 0;
-          b_ex         <= 0;
-          jaloffset_ex <= 0;
-          broffset_ex  <= 0;
-          shamt_ex     <= 0;
-          simm_ex      <= 0;
-          uimm_ex      <= 0;
-          stimm_ex     <= 0;
-          rd_ex        <= 0;
-          rs1_ex       <= 0;
-          rs2_ex       <= 0;
-          pc_ex        <= 0;
-          pc_plus_ex   <= 0;
-          ex           <= 0;
-        end else if(is_stoll)begin
+      if(is_stoll)begin
           a_ex         <= a_ex         ;
           b_ex         <= b_ex         ;
           jaloffset_ex <= jaloffset_ex ;
@@ -211,22 +196,39 @@ module riscv(
           pc_ex        <= pc_ex        ;
           pc_plus_ex   <= pc_plus_ex   ;      
           ex           <= ex           ;
-        end else begin
-          a_ex         <= a_de        ;
-          b_ex         <= b_de        ;
-          jaloffset_ex <= jaloffset_de;
-          broffset_ex  <= broffset_de ;
-          shamt_ex     <= shamt_de    ;
-          simm_ex      <= simm_de     ;
-          uimm_ex      <= uimm_de     ;
-          stimm_ex     <= stimm_de    ;
-          rd_ex        <= rd_de       ;
-          rs1_ex       <= rs1_de      ;
-          rs2_ex       <= rs2_de      ;
-          pc_ex        <= pc_de;
-          pc_plus_ex   <= pc_plus_de;        
-          ex           <= de;
-        end
+
+      end else if(is_jump)begin
+          a_ex         <= 0;
+          b_ex         <= 0;
+          jaloffset_ex <= 0;
+          broffset_ex  <= 0;
+          shamt_ex     <= 0;
+          simm_ex      <= 0;
+          uimm_ex      <= 0;
+          stimm_ex     <= 0;
+          rd_ex        <= 0;
+          rs1_ex       <= 0;
+          rs2_ex       <= 0;
+          pc_ex        <= 0;
+          pc_plus_ex   <= 0;
+          ex           <= 0;
+
+      end else begin
+        a_ex         <= a_de        ;
+        b_ex         <= b_de        ;
+        jaloffset_ex <= jaloffset_de;
+        broffset_ex  <= broffset_de ;
+        shamt_ex     <= shamt_de    ;
+        simm_ex      <= simm_de     ;
+        uimm_ex      <= uimm_de     ;
+        stimm_ex     <= stimm_de    ;
+        rd_ex        <= rd_de       ;
+        rs1_ex       <= rs1_de      ;
+        rs2_ex       <= rs2_de      ;
+        pc_ex        <= pc_de;
+        pc_plus_ex   <= pc_plus_de;        
+        ex           <= de;
+      end
     end
 
     // EXECUTE STATGE
