@@ -14,10 +14,9 @@ module imem(
     input wire [31:0] pc;
     output reg [31:0] inst;
 
-    // Distributed RAM
     localparam data_width = 32;
     localparam addr_width = 12;
-
+    
     // Block RAM
     (* ram_style = "block" *)reg [data_width-1:0] mem [2**addr_width-1:0];  // instruction melmory
     
@@ -31,10 +30,10 @@ module imem(
     end
 
     always_ff@(posedge clk)begin
+        if(is_stoll)
+            inst <= inst;
         if(is_jump)
             inst <= 0;
-        else if(is_stoll)
-            inst <= inst;
         else
             inst <= mem[pc[31:2]];
 
