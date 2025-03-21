@@ -30,10 +30,10 @@ module imem(
     end
 
     always_ff@(posedge clk)begin
+        if(is_stoll)
+            inst <= inst;
         if(is_jump)
             inst <= 0;
-        else if(is_stoll)
-            inst <= inst;
         else
             inst <= mem[pc[31:2]];
 
